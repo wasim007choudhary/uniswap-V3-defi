@@ -1088,7 +1088,6 @@ then computes the current token amounts whenever someone asks.
 ---
 
 ---
-
 # One Final Observation — Every Position Evolves Independently
 
 As the current market price moves,
@@ -1102,13 +1101,23 @@ For a single Position:
 
 As the current price increases,
 
-more of the Position is gradually converted into **Token1 (Token Y)**.
+more of the Position is gradually converted into **Token1 (Token Y).**
 
 As the current price decreases,
 
-more of the Position is gradually converted into **Token0 (Token X)**.
+more of the Position is gradually converted into **Token0 (Token X).**
 
-When the current price moves above a Position's upper price range,
+Eventually, every Position reaches one of three possible states.
+
+| Current Price | Position Composition |
+|---------------|----------------------|
+| **Below Lower Range (`P < Pa`)** | **100% Token0 (Token X)** |
+| **Inside Range (`Pa ≤ P ≤ Pb`)** | **Mixture of Token0 and Token1** |
+| **Above Upper Range (`P > Pb`)** | **100% Token1 (Token Y)** |
+
+So,
+
+when the current price moves above a Position's upper range,
 
 that Position eventually becomes:
 
@@ -1118,7 +1127,9 @@ that Position eventually becomes:
 100% Token1
 ```
 
-When the current price moves below a Position's lower price range,
+Likewise,
+
+when the current price moves below its lower range,
 
 that Position eventually becomes:
 
@@ -1130,22 +1141,22 @@ that Position eventually becomes:
 
 ---
 
-# Additional Discussion — Do Overlapping Positions Become 100% Token1 Together?
+## A Question That Came Up
 
 While studying multiple Positions, an important question came up.
 
-> **Suppose Alice's and Bob's Positions overlap, and the current price keeps increasing. Will both Positions eventually become 0 Token0 and 100% Token1?**
+> **Suppose Alice's and Bob's Positions overlap, and the current price keeps increasing. Will both Positions eventually become 100% Token1?**
 
 The answer is:
 
 > **Yes—but each Position follows its own price range independently.**
 
-The fact that two Positions overlap does **not** mean they transform into Token1 at the same time.
+The fact that two Positions overlap does **not** mean they transition into Token1 at the same time.
 
 Each Position only cares about:
 
-- Its own lower price (or Tick).
-- Its own upper price (or Tick).
+- Its own lower Tick (or lower price).
+- Its own upper Tick (or upper price).
 - The current market price.
 
 It does **not** care about another LP's Position.
@@ -1193,9 +1204,9 @@ Now the current price increases to:
 1.03
 ```
 
-Alice has reached her upper price bound.
+Alice reaches her upper price bound.
 
-Alice's Position becomes:
+Her Position becomes:
 
 ```text
 0 Token0
@@ -1207,7 +1218,7 @@ Alice is now inactive because the current price has moved outside her range.
 
 However,
 
-Bob's Position is still inside its own range:
+Bob is still inside his own range:
 
 ```text
 1.01
@@ -1215,17 +1226,17 @@ Bob's Position is still inside its own range:
 1.05
 ```
 
-So Bob's Position still contains a mixture of Token0 and Token1.
+so his Position still contains a mixture of Token0 and Token1.
 
 ---
 
-Now suppose the current price keeps increasing until:
+Now the current price continues increasing until:
 
 ```text
 1.05
 ```
 
-Bob has now reached his upper price bound.
+Bob also reaches his upper price bound.
 
 His Position becomes:
 
@@ -1239,7 +1250,7 @@ Now both Positions are entirely Token1.
 
 Notice that they **did not** become Token1 at the same time.
 
-Each Position changed according to **its own** upper price bound.
+Each Position transitioned according to **its own** price range.
 
 ---
 
@@ -1283,27 +1294,19 @@ because they share the exact same price range.
 
 ---
 
-# General Rule
+## The General Rule
 
-Every Position behaves independently.
+Every Position evolves independently.
 
-For every Position:
+Each Position asks only one question:
 
-- **Price below its lower range (`P < Pa`) → 100% Token0**
-- **Price inside its range (`Pa ≤ P ≤ Pb`) → A mixture of Token0 and Token1**
-- **Price above its upper range (`P > Pb`) → 100% Token1**
+> **"Where is the current market price relative to my own lower and upper Tick?"**
 
-Overlapping Positions do **not** change this rule.
-
-Each Position only asks one question:
-
-> **"Where is the current market price relative to my own lower and upper price?"**
-
-Not anyone else's.
+It never checks another LP's Position.
 
 Because of this,
 
-multiple Positions can be in completely different states at the same time.
+multiple Positions can simultaneously be in completely different states.
 
 For example,
 
@@ -1323,32 +1326,279 @@ while Bob's Position is still:
 60% Token1
 ```
 
-This happens because Alice has already crossed her upper price bound, while Bob is still inside his own range.
+Likewise,
 
-Likewise, if two Positions have exactly the same range, they will transition through these states together.
+if two Positions share exactly the same range,
 
-This is one of the reasons Uniswap V3 stores every Position separately.
+they will transition through these states together.
 
-Each Position evolves independently as the current market price moves.
+This independent behavior is one of the reasons Uniswap V3 stores every Position separately.
+
+---
+
+# Real-World Example — Liquidity Price Graph for the WETH/USDT Pool
+
+This lesson introduces **no new protocol mechanics.**
+
+Instead,
+
+it visualizes everything we've already learned using the real **WETH/USDT** pool on the Uniswap interface.
+
+Think of it as seeing the previous concepts come to life.
+
+---
+
+## Mapping the Tokens
+
+Throughout the previous lessons, we used generic token names:
+
+```text
+Token0 (Token X)
+
+Token1 (Token Y)
+```
+
+In the WETH/USDT pool:
+
+```text
+Token0 = WETH
+
+Token1 = USDT
+```
+
+So whenever we previously said:
+
+```text
+Token0
+```
+
+you can now think:
+
+```text
+WETH
+```
+
+Whenever we previously said:
+
+```text
+Token1
+```
+
+you can now think:
+
+```text
+USDT
+```
+
+---
+
+## Moving Along the Liquidity Graph
+
+As you move from **left to right** on the graph:
+
+- The Tick increases.
+- The price increases.
+
+Since this pool is **WETH/USDT**,
+
+moving to the right means:
+
+```text
+1 WETH costs more USDT.
+```
+
+For example:
+
+```text
+1800 USDT
+
+↓
+
+2000 USDT
+
+↓
+
+2200 USDT
+```
+
+Moving left means the opposite.
+
+---
+
+## Why Does the Liquidity Graph Have This Shape?
+
+We've already learned the answer.
+
+The graph is **not** created by one liquidity provider.
+
+Instead,
+
+every LP has their own Position.
+
+For example,
+
+```text
+Alice
+
+1800 → 2000
+```
+
+```text
+Bob
+
+1900 → 2200
+```
+
+```text
+Charlie
+
+1950 → 2100
+```
+
+Whenever multiple Positions overlap,
+
+their liquidity is added together.
+
+Conceptually,
+
+the graph is simply showing:
+
+```text
+Position A
+
++
+
+Position B
+
++
+
+Position C
+
++
+
+Position D
+
+↓
+
+Total Active Liquidity
+```
+
+So the unique shape of the graph comes from stacking together all Positions that overlap each price.
+
+---
+
+## Understanding the Current Price
+
+Suppose the current market price is:
+
+```text
+2000 USDT per WETH
+```
+
+At the current price,
+
+active Positions contain a mixture of:
+
+```text
+WETH
+
++
+
+USDT
+```
+
+because they are still inside their chosen price ranges.
+
+---
+
+## Looking to the Left of the Current Price
+
+Everything to the **left** of the current price has already crossed that price.
+
+Those Positions have already transitioned into:
+
+```text
+100% Token1
+```
+
+For this pool:
+
+```text
+100% USDT
+```
+
+because:
+
+```text
+Token1 = USDT
+```
+
+---
+
+## Looking to the Right of the Current Price
+
+Everything to the **right** of the current price has not yet reached that price.
+
+Those Positions are still:
+
+```text
+100% Token0
+```
+
+For this pool:
+
+```text
+100% WETH
+```
+
+because:
+
+```text
+Token0 = WETH
+```
+
+---
+
+## Child Analogy
+
+Imagine standing in the middle of a very long road.
+
+The road represents every possible market price.
+
+Everything behind you has already happened.
+
+Everything ahead of you hasn't happened yet.
+
+For the WETH/USDT pool:
+
+- The road **behind you** (left of the current price) contains Positions that have already become **100% USDT (Token1).**
+- The road **ahead of you** (right of the current price) contains Positions that are still **100% WETH (Token0).**
+- Where you're currently standing, Positions are still transitioning and therefore contain a mixture of WETH and USDT.
+
+As the market price moves,
+
+this transition point also moves.
+
+The Uniswap interface is simply visualizing this behavior.
 
 ---
 
 # Key Takeaways
 
-- A Uniswap V3 pool is made up of many independent liquidity Positions.
-- Every LP chooses their own lower and upper Tick (price range).
-- During a swap, every active Position contributes liquidity simultaneously.
-- The pool behaves like one large liquidity pool during swaps, while each Position remains independently owned.
-- Active liquidity is simply the sum of all Positions whose ranges include the current market price.
-- Fees are distributed proportionally according to each Position's liquidity.
-- Liquidity (`L`) is stored by the protocol.
-- Current token balances are **not** stored; they are calculated from:
-  - Liquidity (`L`)
-  - Current Price (`P`)
-  - Lower Price (`Pa`)
-  - Upper Price (`Pb`)
-- This design greatly reduces gas costs because token balances do not need to be updated after every swap.
 - Every Position continuously changes its Token0/Token1 composition as the market price moves.
-- Each Position evolves **independently** according to its own price range.
-- Two overlapping Positions may be in completely different token compositions if their price ranges are different.
-- Two Positions with identical price ranges will transition between Token0 and Token1 together.
+- Every Position independently transitions through three states:
+  - **100% Token0**
+  - **A mixture of Token0 and Token1**
+  - **100% Token1**
+- Overlapping Positions do **not** have to transition at the same time.
+- Positions with identical price ranges transition together.
+- Every Position evolves independently according to its own lower and upper Tick.
+- The real WETH/USDT liquidity graph is simply a visualization of these concepts.
+- In the WETH/USDT pool:
+  - **Token0 = WETH**
+  - **Token1 = USDT**
+- To the **left** of the current price, liquidity is entirely **USDT (Token1).**
+- At the **current price**, liquidity is a mixture of **WETH and USDT.**
+- To the **right** of the current price, liquidity is entirely **WETH (Token0).**
+- The unique shape of the liquidity graph comes from stacking together all overlapping liquidity Positions.
+- This lesson serves as a real-world confirmation of the concepts introduced in the previous lessons rather than introducing new protocol mechanics.
