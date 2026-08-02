@@ -879,3 +879,239 @@ just remember:
 - Every Tick corresponds to one unique price.
 - Liquidity positions are defined using a **Lower Tick** and an **Upper Tick**.
 - The protocol converts those Tick values into actual prices internally.
+
+---
+---
+---
+
+# Additional Discussion — Graphing Tick on the Constant Product Curve
+
+The course briefly shows an animation of how the **Tick** moves along the constant-product curve.
+
+Instead of treating it as a separate topic, it's better to understand **what the animation is actually trying to teach.**
+
+---
+
+# First Question
+
+> **What is the constant-product curve?**
+
+Conceptually,
+
+the constant-product curve is simply the collection of **every possible reserve combination** that satisfies the AMM equation.
+
+For example, a pool might move through these reserve combinations over time:
+
+```text
+100 DAI    100 USDC
+
+↓
+
+110 DAI    90.91 USDC
+
+↓
+
+150 DAI    66.66 USDC
+
+↓
+
+200 DAI    50 USDC
+```
+
+Each of these reserve combinations represents **one point** on the same constant-product curve.
+
+The curve itself doesn't represent one pool state.
+
+It represents **all possible pool states**.
+
+---
+
+# Then I Asked...
+
+> **Where is the pool right now?**
+
+The pool cannot exist at every point on the curve simultaneously.
+
+It must currently be located at **one specific point**.
+
+For example,
+
+suppose the pool currently contains:
+
+```text
+100 DAI
+100 USDC
+```
+
+Then the pool is located at one point on the curve.
+
+Now suppose someone performs a swap.
+
+The reserves become:
+
+```text
+110 DAI
+90.91 USDC
+```
+
+The pool now moves to another point on the same curve.
+
+Notice something important.
+
+The curve did **not** move.
+
+The pool's **position** on the curve moved.
+
+---
+
+# How Does Uniswap V3 Know Its Position?
+
+In Uniswap V2,
+
+the protocol simply looked at the reserves.
+
+From the reserves,
+
+it calculated the price.
+
+In Uniswap V3,
+
+things are reversed.
+
+The protocol primarily tracks:
+
+- Liquidity
+- Current Tick
+
+From the current Tick,
+
+it calculates the current price.
+
+Then,
+
+using the current price and liquidity,
+
+it can calculate the corresponding reserves.
+
+So instead of saying:
+
+> **"The reserves determine the price."**
+
+Uniswap V3 effectively says:
+
+> **"The Tick determines the price, and the price determines where we are on the curve."**
+
+---
+
+# Child Analogy — Google Maps
+
+Imagine someone asks:
+
+> **"Where are you?"**
+
+You don't answer:
+
+> "Somewhere on Earth."
+
+Instead,
+
+you give your location.
+
+For example:
+
+```text
+Latitude
+
+Longitude
+```
+
+Those coordinates identify one exact location.
+
+Ticks work similarly.
+
+The protocol doesn't simply know that the pool exists somewhere on the constant-product curve.
+
+Instead,
+
+it stores the current Tick,
+
+which identifies the current price,
+
+and therefore identifies the pool's current position on the curve.
+
+---
+
+# How the Tick Moves
+
+Suppose:
+
+```text
+Tick = 0
+```
+
+The corresponding price is:
+
+```text
+Price = 1
+```
+
+This places the pool at one specific point on the curve.
+
+Now suppose traders begin buying Token0.
+
+The price increases.
+
+As the price increases,
+
+the Tick also increases.
+
+The current point moves further along the constant-product curve.
+
+If traders instead sell Token0,
+
+the price decreases,
+
+the Tick decreases,
+
+and the current point moves in the opposite direction.
+
+Nothing about the curve changes.
+
+Only the pool's position changes.
+
+---
+
+# Child Analogy — Train on Railway Tracks
+
+Imagine a train traveling along railway tracks.
+
+The railway tracks represent the **constant-product curve**.
+
+The train represents the **current market price**.
+
+As trades occur,
+
+the train moves forward or backward along the same tracks.
+
+The railway never changes.
+
+Only the train's current position changes.
+
+Exactly the same thing happens in Uniswap V3.
+
+The constant-product curve always exists.
+
+The current Tick simply tells us where the pool is located on that curve at this moment.
+
+---
+
+# Key Takeaways
+
+- The constant-product curve represents every possible reserve combination that satisfies the AMM equation.
+- The pool is always located at one specific point on that curve.
+- In Uniswap V2, the current reserves determine the current price.
+- In Uniswap V3, the current Tick determines the current price.
+- Once the current price is known, the protocol can determine the corresponding reserves.
+- Increasing the Tick moves the current position toward higher prices.
+- Decreasing the Tick moves the current position toward lower prices.
+- The curve itself never changes—only the pool's position on the curve changes.
