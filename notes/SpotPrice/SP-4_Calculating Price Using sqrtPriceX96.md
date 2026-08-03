@@ -555,3 +555,503 @@ P = (sqrtPriceX96 / 2^96)²
   1. Divide by `2^96`.
   2. Square the result.
 - We'll later learn **why Uniswap stores the square root of the price** and **why it specifically uses `2^96`** when we study Q64.96 fixed-point numbers.
+
+---
+
+# Calculating Spot Price from `sqrtPriceX96` using a **real `sqrtPriceX96` value
+
+This is same as **SP-4_Calculating price from Tick.md** but for `sqrtPriceX96` and not tick.
+
+In the previous lesson, we derived the formula for calculating the price from `sqrtPriceX96`:
+
+```text
+Price = (sqrtPriceX96 / 2^96)^2
+```
+
+In this lesson, we'll use a **real `sqrtPriceX96` value** taken from the WETH/USDT Uniswap V3 Pool and calculate the actual market price.
+
+This lesson doesn't introduce any new mathematics.
+
+Instead, it puts everything we've already learned into practice.
+
+---
+
+# Step 1 — Read `sqrtPriceX96` from the Pool
+
+Suppose the Pool returns:
+
+```text
+sqrtPriceX96 = 4551852809367933182694918
+```
+
+At first glance,
+
+this huge number doesn't look anything like an ETH price.
+
+That's because this number is **not the price itself.**
+
+It is actually:
+
+```text
+sqrtPriceX96 = √Price × 2^96
+```
+
+The protocol stores the **square root of the price**, multiplied by a scaling factor (`2^96`).
+
+---
+
+# Step 2 — Remove the Scaling Factor
+
+We know:
+
+```text
+sqrtPriceX96 = √Price × 2^96
+```
+
+Our goal is to recover:
+
+```text
+√Price
+```
+
+To remove the multiplication by `2^96`,
+
+divide both sides by `2^96`.
+
+```text
+sqrtPriceX96 / 2^96
+
+=
+
+(√Price × 2^96)
+
+/ 2^96
+```
+
+The `2^96` cancels:
+
+```text
+sqrtPriceX96 / 2^96
+
+=
+
+√Price
+```
+
+Now we've recovered the square root price.
+
+---
+
+# Step 3 — Recover the Actual Price
+
+We're close,
+
+but we still have:
+
+```text
+√Price
+```
+
+instead of:
+
+```text
+Price
+```
+
+How do we remove a square root?
+
+Suppose:
+
+```text
+√25 = 5
+```
+
+To recover:
+
+```text
+25
+```
+
+we simply square the result.
+
+Exactly the same thing happens here.
+
+```text
+Price
+
+=
+
+(√Price)^2
+```
+
+Substituting our previous equation:
+
+```text
+Price
+
+=
+
+(sqrtPriceX96 / 2^96)^2
+```
+
+This is exactly the formula we derived in the previous lesson.
+
+---
+
+# Why Is the Calculated Price Still So Small?
+
+Suppose we calculate:
+
+```python
+price = (sqrtPriceX96 / 2**96) ** 2
+```
+
+The result might be:
+
+```text
+0.000000003378
+```
+
+At first glance,
+
+this looks completely wrong.
+
+We know:
+
+```text
+1 WETH ≈ 3378 USDT
+```
+
+not
+
+```text
+1 WETH = 0.000000003378 USDT
+```
+
+Nothing is wrong.
+
+We've simply forgotten to account for ERC20 decimals.
+
+---
+
+# Understanding the Decimal Problem Again
+
+This Pool contains:
+
+```text
+Token0 = WETH
+
+18 Decimals
+```
+
+```text
+Token1 = USDT
+
+6 Decimals
+```
+
+The price is defined as:
+
+```text
+Price = Token1 / Token0
+```
+
+which means:
+
+```text
+Price = USDT / WETH
+```
+
+However,
+
+the protocol actually works with the raw integer values.
+
+Instead of:
+
+```text
+1 USDT
+```
+
+it stores:
+
+```text
+1 × 10^6
+```
+
+Instead of:
+
+```text
+1 WETH
+```
+
+it stores:
+
+```text
+1 × 10^18
+```
+
+Therefore,
+
+the calculated price actually contains:
+
+```text
+10^6 / 10^18
+
+=
+
+10^-12
+```
+
+This extra scaling factor makes the calculated value appear extremely small.
+
+---
+
+# Child Analogy — Different Measuring Units
+
+Imagine two people measuring the same table.
+
+One measures in:
+
+```text
+Meters
+```
+
+The other measures in:
+
+```text
+Millimeters
+```
+
+The first person says:
+
+```text
+2 meters
+```
+
+The second says:
+
+```text
+2000 millimeters
+```
+
+Neither person is wrong.
+
+They're simply using different units.
+
+Exactly the same thing happens here.
+
+WETH and USDT use different decimal units,
+
+so before interpreting the price,
+
+we must normalize both tokens to the same scale.
+
+---
+
+# Removing the Decimal Scaling
+
+Since the price contains:
+
+```text
+10^-12
+```
+
+we need to remove it.
+
+The lesson does this by writing:
+
+```python
+price / 1e6 * 1e18
+```
+
+Let's understand why.
+
+First,
+
+divide by:
+
+```text
+1e6
+```
+
+Then,
+
+multiply by:
+
+```text
+1e18
+```
+
+Mathematically,
+
+this becomes:
+
+```text
+price
+
+×
+
+1e18
+
+/
+
+1e6
+```
+
+Simplifying:
+
+```text
+price
+
+×
+
+10^12
+```
+
+because:
+
+```text
+10^18 / 10^6
+
+=
+
+10^12
+```
+
+So:
+
+```python
+price / 1e6 * 1e18
+```
+
+and
+
+```python
+price * 1e12
+```
+
+are exactly the same.
+
+The lesson writes it using the token decimals because this approach works for **any ERC20 pair**, not just WETH and USDT.
+
+---
+
+# Final Result
+
+After removing the decimal scaling,
+
+the price becomes:
+
+```text
+3378
+```
+
+which means:
+
+```text
+1 WETH ≈ 3378 USDT
+```
+
+Now the calculated value matches the actual market price.
+
+---
+
+# Child Analogy — Opening Three Boxes
+
+Imagine someone hides the answer inside three boxes.
+
+### Box 1
+
+The protocol multiplies the square root price by:
+
+```text
+2^96
+```
+
+### Box 2
+
+The protocol stores:
+
+```text
+√Price
+```
+
+instead of:
+
+```text
+Price
+```
+
+### Box 3
+
+ERC20 decimals scale the final answer.
+
+To recover the real market price,
+
+we simply open the boxes one by one.
+
+```text
+sqrtPriceX96
+
+↓
+
+Divide by 2^96
+
+↓
+
+√Price
+
+↓
+
+Square It
+
+↓
+
+Raw Price
+
+↓
+
+Remove ERC20 Decimal Scaling
+
+↓
+
+Actual Market Price
+```
+
+Every step simply reverses something that was done earlier.
+
+---
+
+# Key Takeaways
+
+- `sqrtPriceX96` is **not** the actual price.
+- It is defined as:
+  ```text
+  sqrtPriceX96 = √Price × 2^96
+  ```
+- Divide by `2^96` to recover the square root price.
+- Square the result to recover the raw price:
+  ```text
+  Price = (sqrtPriceX96 / 2^96)^2
+  ```
+- The calculated price still contains ERC20 decimal scaling.
+- For the WETH/USDT pool:
+  - WETH has **18 decimals**.
+  - USDT has **6 decimals**.
+- The raw price therefore contains:
+  ```text
+  10^6 / 10^18 = 10^-12
+  ```
+- Normalize the decimals by:
+  ```python
+  price / 1e6 * 1e18
+  ```
+  which is mathematically identical to:
+  ```python
+  price * 1e12
+  ```
+- After normalization, the calculated price matches the real market price:
+  ```text
+  1 WETH ≈ 3378 USDT
+  ```
+- This lesson introduces **no new mathematics**. It simply applies the formula derived in the previous lesson using a real `sqrtPriceX96` value from a Uniswap V3 Pool.
