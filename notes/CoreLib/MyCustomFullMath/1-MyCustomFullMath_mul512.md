@@ -8,6 +8,7 @@ Unlike the EVM's normal `MUL` instruction, which returns only the lower 256 bits
 - `low` → Lower 256 bits
 
 ---
+>**Important:** ALso can check the comments and natspecs added in the functions also for ones own betterment
 
 ## The Function
 

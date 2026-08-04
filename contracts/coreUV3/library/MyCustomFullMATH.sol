@@ -7,6 +7,20 @@ library MyCustomFullMath {
     error MyCustomFullMath__mulDiv__ResultOverflowsUint256();
     error MyCustomFullMath__mulDivRoundUp__ResultOverflowsUint256();
 
+    /**
+     * @notice Multiplies two uint256 values and returns the full 512-bit product.
+     * @dev The product is split into two uint256 values:
+     * - upperPart: The most significant 256 bits.
+     * - lowerPart: The least significant 256 bits.
+     *
+     * @param x The multiplicand.
+     * @param y The multiplier.
+     * @return upperPart The upper 256 bits of the 512-bit product.
+     * @return lowerPart The lower 256 bits of the 512-bit product.
+     *  ---------------------------------------------------------------------------------------------------------------------------------------------------
+     *  @custom:visit- notes/CoreLib/MyCustomFullMath/1-MyCustomFullMath_mul512.md for a complete dissection and reverse engineering of this function.
+     *  ---------------------------------------------------------------------------------------------------------------------------------------------------
+     */
     function mul512(uint256 x, uint256 y) internal pure returns (uint256 upperPart, uint256 lowerPart) {
         assembly ("memory-safe") {
             let mm := mulmod(x, y, not(0))
@@ -15,7 +29,7 @@ library MyCustomFullMath {
         }
     }
 
-    /*
+    /* Flow Chart for -
        mulDiv(x, y, denominator)
     │
     ├──────────────────────────────────────────────────────────────┐
@@ -156,22 +170,58 @@ library MyCustomFullMath {
     │                                                              │
     │ = Exact floor(x × y ÷ denominator)                           │
     └──────────────────────────────────────────────────────────────┘*/
+    /**
+     * @notice Computes floor(x × y ÷ denominator) with full 512-bit precision.
+     * @dev Prevents intermediate multiplication overflow by performing the
+     * calculation using a 512-bit product and returns the largest integer less
+     * than or equal to the exact result.
+     *
+     * Reverts if:
+     * - denominator is zero.
+     * - The final quotient cannot fit inside a uint256.
+     *
+     * @param x The multiplicand.
+     * @param y The multiplier.
+     * @param denominator The divisor.
+     * @return result The floor of (x × y ÷ denominator).
+     *
+     * @custom:reverts MyCustomFullMath__mulDiv__DivisionByZero
+     * Thrown when the denominator is zero.
+     *
+     * @custom:reverts MyCustomFullMath__mulDiv__ResultOverflowsUint256
+     * Thrown when the final quotient exceeds the uint256 range.
+     *
+     *  ---------------------------------------------------------------------------------------------------------------------------------------------------
+     *  @custom:visit- notes/CoreLib/MyCustomFullMath/2-MyCustomFullMath_mulDiv for a complete reverse engineering of the mulDiv function,
+     *  including a detailed flow chart and step-by-step/code line by code line explanation of the function implementation.
+     *  ---------------------------------------------------------------------------------------------------------------------------------------------------
+     */
     function mulDiv(uint256 x, uint256 y, uint256 denominator) internal pure returns (uint256 result) {
         unchecked {
             (uint256 upperPart, uint256 lowerPart) = mul512(x, y);
-            // checking if the upper part is zero which means the 512 fits inside u256 , if it is then we can safely divide the lower part by the denominator and return the result
+
+            // If the upper 256 bits are zero, the entire product already fits inside a
+            // single uint256.
+            //
+            // In this case, we can perform a normal Solidity division without using the
+            // more complex 512-bit division algorithm.
             if (upperPart == 0) {
-                result = lowerPart / denominator;
+                return lowerPart / denominator;
             }
 
-            //checking if the result is greater than 2^256 - 1 or denominator is zero as the result must be 256 bits or less
+            // The final answer must fit inside a uint256.
+            //
+            // If upperPart is greater than or equal to the denominator, the quotient
+            // would be at least 2²⁵⁶, which cannot fit inside a uint256.
+            //
+            // Also handle division by zero.
             if (upperPart >= denominator) {
                 if (denominator == 0) {
                     revert MyCustomFullMath__mulDiv__DivisionByZero();
                 }
                 revert MyCustomFullMath__mulDiv__ResultOverflowsUint256();
             }
-
+            /* --------------------------------------------------------------------------------------------------------------------------------------------------*/
             // -------------------------------------------------------------------------
             // 512-by-256 Division
             //
@@ -210,7 +260,67 @@ library MyCustomFullMath {
                 lowerPart := sub(lowerPart, remainder)
             }
 
-            // -------------------------------------------------------------------------
+            /*--------------------------------------------------------------------------------------------------------------------------------------------------*/
+            // --------------------------------------------------------------------------------------------------------------------------------------------------
+            // Find the biggest power of 2 that divides the denominator.
+            //
+            // Think of repeatedly dividing by 2 until we would get a remainder.
+            //
+            // Example:
+            //
+            // 40 = 101000₂
+            //
+            // 40 ÷ 2 = 20 ✅
+            // 20 ÷ 2 = 10 ✅
+            // 10 ÷ 2 = 5  ✅
+            //  5 ÷ 2 = 2.5 ❌ (stop)
+            //
+            // We divided by 2 exactly 3 times, so the largest power of 2 is:
+            //
+            // 2³ = 8 = 001000₂
+            //
+            // This value is stored in `twos`.
+            uint256 twos = denominator & (0 - denominator);
+
+            assembly ("memory-safe") {
+                // Remove that power of 2 from the denominator.
+                //
+                // Example:
+                // 40 ÷ 8 = 5
+                denominator := div(denominator, twos)
+
+                // Remove the same power of 2 from the lower 256 bits of the numerator.
+                //
+                // We divide both the numerator and denominator by the same value so the
+                // final quotient stays exactly the same.
+                lowerPart := div(lowerPart, twos)
+
+                // Flip `twos` into (2²⁵⁶ / twos).
+                //
+                // Example:
+                //
+                // If twos = 8,
+                //
+                // it becomes:
+                //
+                // 2²⁵⁶ / 8 = 2²⁵³
+                //
+                // This will be used in the next step to shift the remaining bits from
+                // upperPart into lowerPart.
+                twos := add(div(sub(0, twos), twos), 1)
+            }
+
+            // Shift the remaining bits from upperPart into lowerPart.
+            //
+            // Think of the full 512-bit number being shifted right.
+            // Some bits from the upper half "fall" into the lower half.
+            //
+            // This line moves those bits back into their correct positions, rebuilding
+            // the correctly shifted 512-bit numerator.
+            lowerPart |= upperPart * twos;
+
+            /*--------------------------------------------------------------------------------------------------------------------------------------------------*/
+            // --------------------------------------------------------------------------------------------------------------------------------------------------
             // Step 1: Create an initial "magic guess" for the modular inverse.
             //
             // We eventually want a special number called the modular inverse such that:
@@ -306,6 +416,28 @@ library MyCustomFullMath {
         }
     }
 
+    /**
+     * @notice Computes ceil(x × y ÷ denominator) with full 512-bit precision.
+     * @dev Calls {mulDiv} to compute the floor result, then rounds up by one if
+     * a non-zero remainder exists.
+     *
+     * Reverts if:
+     * - denominator is zero.
+     * - The final quotient cannot fit inside a uint256.
+     * - Rounding up would overflow uint256.
+     *
+     * @param x The multiplicand.
+     * @param y The multiplier.
+     * @param denominator The divisor.
+     * @return result The ceiling of (x × y ÷ denominator).
+     *
+     * @custom:reverts MyCustomFullMath__mulDivRoundUp__ResultOverflowsUint256
+     * Thrown when rounding the result up by one would overflow uint256.
+     *
+     *  ---------------------------------------------------------------------------------------------------------------------------------------------------
+     *  @custom:visit- notes/CoreLib/MyCustomFullMath/3-MulDivRoundUp.md for a complete reverse engineering of the mulDivRoundUp function.
+     *  ---------------------------------------------------------------------------------------------------------------------------------------------------
+     */
     function mulDivRoundUp(uint256 x, uint256 y, uint256 denominator) internal pure returns (uint256 result) {
         result = mulDiv(x, y, denominator);
         if (mulmod(x, y, denominator) > 0) {
