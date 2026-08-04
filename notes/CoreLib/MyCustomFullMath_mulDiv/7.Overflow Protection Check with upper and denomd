@@ -1,0 +1,433 @@
+# 8. Overflow Protection — Why `upperPart >= denominator` Means Failure
+
+After the fast path, OpenZeppelin uses panic and ternianry library but I changed it made it more readable and with same gas impact and better auditibility which performs one very important check.
+
+```solidity
+if (upperPart >= denominator) {
+    if (denominator == 0) {
+        revert MyCustomFullMath__mulDiv__DivisionByZero();
+    }
+    revert MyCustomFullMath__mulDiv__ResultOverflowsUint256();
+}
+```
+
+At first glance this looks strange.
+
+Why compare
+
+```text
+upperPart
+```
+
+with
+
+```text
+denominator
+```
+
+instead of comparing the final answer?
+
+Let's derive it.
+
+---
+
+# What Are We Trying To Compute?
+
+We want
+
+```text
+Product ÷ denominator
+```
+
+where
+
+```text
+Product
+
+=
+
+upperPart × 2²⁵⁶
+
++
+
+lowerPart
+```
+
+Remember,
+
+```text
+lowerPart
+
+<
+
+2²⁵⁶
+```
+
+because it contains exactly the lower 256 bits.
+
+---
+
+# The Question
+
+We want to know:
+
+> **Can the quotient fit inside a uint256?**
+
+A uint256 can store
+
+```text
+0
+
+↓
+
+2²⁵⁶ − 1
+```
+
+So the quotient must satisfy
+
+```text
+Quotient
+
+<
+
+2²⁵⁶
+```
+
+---
+
+# Suppose `upperPart >= denominator`
+
+Let's assume
+
+```text
+upperPart = denominator
+```
+
+Then the product becomes
+
+```text
+Product
+
+=
+
+denominator × 2²⁵⁶
+
++
+
+lowerPart
+```
+
+Now divide by the denominator.
+
+```text
+Product ÷ denominator
+
+=
+
+(denominator × 2²⁵⁶ + lowerPart)
+
+÷ denominator
+```
+
+Split the division.
+
+```text
+=
+
+2²⁵⁶
+
++
+
+(lowerPart ÷ denominator)
+```
+
+Notice something.
+
+The answer already contains
+
+```text
+2²⁵⁶
+```
+
+before adding anything else.
+
+But the largest uint256 is
+
+```text
+2²⁵⁶ − 1
+```
+
+Therefore
+
+```text
+Quotient
+
+≥
+
+2²⁵⁶
+```
+
+It cannot fit inside uint256.
+
+Overflow is guaranteed.
+
+---
+
+# What If `upperPart > denominator`?
+
+Even worse.
+
+Suppose
+
+```text
+upperPart = denominator + 1
+```
+
+Then
+
+```text
+Product
+
+=
+
+(denominator + 1) × 2²⁵⁶
+
++
+
+lowerPart
+```
+
+Divide.
+
+```text
+Quotient
+
+=
+
+2²⁵⁶
+
++
+
+2²⁵⁶ / denominator
+
++
+
+(lowerPart / denominator)
+```
+
+Now the quotient is **even larger**.
+
+Overflow is absolutely guaranteed.
+
+---
+
+# Therefore
+
+Whenever
+
+```text
+upperPart
+
+≥
+
+denominator
+```
+
+the quotient cannot possibly fit into
+
+```text
+uint256.
+```
+
+No amount of clever mathematics can fix this.
+
+The answer itself is too large.
+
+So the function must revert.
+
+---
+
+# Child Analogy
+
+Imagine your calculator can display numbers up to
+
+```text
+9999
+```
+
+Suppose someone asks you to calculate
+
+```text
+15000
+```
+
+Can you shrink it?
+
+No.
+
+The answer itself is simply too large.
+
+The problem is not your calculation.
+
+The problem is the answer.
+
+That is exactly what this check detects.
+
+---
+
+# Why Not Continue Anyway?
+
+Everything after this point assumes
+
+```text
+Final Answer
+
+<
+
+2²⁵⁶
+```
+
+The modular inverse trick,
+
+the bit shifting,
+
+the Newton-Raphson refinement,
+
+all of them rely on the quotient fitting into one uint256.
+
+If it doesn't,
+
+the mathematics is no longer valid for the desired output type.
+
+So OpenZeppelin stops immediately.
+
+---
+
+# Why Is Division By Zero Included Here?
+
+Notice:
+
+```solidity
+if (upperPart >= denominator)
+```
+
+If
+
+```text
+denominator = 0
+```
+
+then
+
+```text
+upperPart ≥ 0
+```
+
+is always true.
+
+So division by zero naturally enters this branch.
+
+Instead of letting the EVM fail later,
+
+OpenZeppelin throws a clear custom error.
+
+---
+
+# Visual Intuition
+
+Suppose
+
+```text
+Product
+
+=
+
+upperPart × 2²⁵⁶
+
++
+
+lowerPart
+```
+
+Case 1
+
+```text
+upperPart < denominator
+
+↓
+
+Quotient fits
+
+↓
+
+Continue
+```
+
+Case 2
+
+```text
+upperPart ≥ denominator
+
+↓
+
+Quotient ≥ 2²⁵⁶
+
+↓
+
+Overflow
+
+↓
+
+Revert
+```
+
+---
+
+# Key Takeaways
+
+* The goal is to guarantee the final quotient fits inside a `uint256`.
+* If `upperPart >= denominator`, the quotient is mathematically guaranteed to be at least `2²⁵⁶`.
+* A `uint256` cannot store `2²⁵⁶` or larger.
+* Therefore the function must revert.
+* This is not an optimization.
+* It is a mathematical proof that the desired output type cannot represent the answer.
+
+---
+
+# Flow So Far
+
+```text
+Compute 512-bit Product
+
+↓
+
+Split into
+
+upperPart
+
++
+
+lowerPart
+
+↓
+
+upperPart == 0 ?
+
+│
+├── YES → Normal division → Return
+│
+└── NO
+      ↓
+upperPart ≥ denominator ?
+
+│
+├── YES → Quotient cannot fit inside uint256 → Revert
+│
+└── NO
+      ↓
+Safe to continue
+
+↓
+
+Make the division exact
+```

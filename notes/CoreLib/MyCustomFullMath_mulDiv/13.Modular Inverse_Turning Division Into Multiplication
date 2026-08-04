@@ -1,0 +1,450 @@
+# 14. Modular Inverse — Turning Division Into Multiplication
+
+After all the previous steps, our problem has been transformed into something much simpler.
+
+Originally we had:
+
+```text
+512-bit Numerator
+
+÷
+
+Even Denominator
+```
+
+After removing the remainder, factoring out powers of two, and shifting the upper bits into the lower bits, we now have:
+
+```text
+256-bit Numerator
+
+÷
+
+Odd Denominator
+```
+
+This is exactly the form required for the modular inverse.
+
+---
+
+# Where We Are
+
+At this point,
+
+our code is:
+
+```solidity
+uint256 inverse = (3 * denominator) ^ 2;
+```
+
+followed by
+
+```solidity
+inverse *= 2 - denominator * inverse;
+inverse *= 2 - denominator * inverse;
+inverse *= 2 - denominator * inverse;
+inverse *= 2 - denominator * inverse;
+inverse *= 2 - denominator * inverse;
+inverse *= 2 - denominator * inverse;
+```
+
+and finally
+
+```solidity
+result = lowerPart * inverse;
+```
+
+Everything we did previously was preparing for these lines.
+
+---
+
+# The Big Question
+
+Why don't we simply write
+
+```solidity
+lowerPart / denominator;
+```
+
+The answer is:
+
+Because the numerator originally came from a
+
+```text
+512-bit number.
+```
+
+The EVM has no instruction for
+
+```text
+512-bit ÷ 256-bit
+```
+
+division.
+
+However,
+
+the EVM is extremely good at
+
+```text
+256-bit multiplication.
+```
+
+So instead of dividing,
+
+OpenZeppelin transforms the problem into a multiplication.
+
+---
+
+# Normal Mathematics
+
+In ordinary mathematics,
+
+division can always be rewritten.
+
+Example
+
+```text
+100 ÷ 5
+```
+
+is exactly the same as
+
+```text
+100 × (1 / 5)
+```
+
+Both equal
+
+```text
+20.
+```
+
+Notice what happened.
+
+The division disappeared.
+
+It became a multiplication.
+
+---
+
+# Why Can't Solidity Do This?
+
+Suppose
+
+```text
+denominator = 5.
+```
+
+Then
+
+```text
+1 / 5
+
+=
+
+0.2
+```
+
+But Solidity only has integers.
+
+It cannot store
+
+```text
+0.2.
+```
+
+So writing
+
+```solidity
+lowerPart * (1 / denominator)
+```
+
+is impossible.
+
+The value
+
+```text
+1 / denominator
+```
+
+does not exist as an integer.
+
+---
+
+# The Modular Inverse
+
+Instead,
+
+we compute a special integer called the
+
+```text
+Modular Inverse.
+```
+
+This integer satisfies
+
+```text
+denominator × inverse
+
+≡
+
+1
+
+(mod 2²⁵⁶)
+```
+
+Read this slowly.
+
+If we multiply
+
+```text
+denominator
+```
+
+by
+
+```text
+inverse,
+```
+
+we do **not** obtain
+
+```text
+1
+```
+
+in ordinary arithmetic.
+
+We obtain
+
+```text
+1
+```
+
+on the giant
+
+```text
+2²⁵⁶-position clock.
+```
+
+That is all modular arithmetic means.
+
+---
+
+# Child Analogy
+
+Imagine a giant clock with
+
+```text
+2²⁵⁶
+```
+
+numbers.
+
+Instead of asking
+
+```text
+"What is 1 ÷ denominator?"
+```
+
+we ask
+
+> **"Which number brings us back to 1 after multiplying on this giant clock?"**
+
+That number is called
+
+```text
+inverse.
+```
+
+---
+
+# Why Is It Called An Inverse?
+
+Many people ask:
+
+> "Why call it an inverse? Why not just call it a number?"
+
+Because its entire purpose is to **undo multiplication**.
+
+Suppose
+
+```text
+denominator = 5.
+```
+
+If
+
+```text
+5 × inverse ≡ 1
+```
+
+then multiplying by
+
+```text
+inverse
+```
+
+has the same effect as dividing by
+
+```text
+5.
+```
+
+It is literally the multiplicative inverse of
+
+```text
+5
+```
+
+inside modulo
+
+```text
+2²⁵⁶.
+```
+
+That is why the mathematical name is
+
+```text
+Modular Multiplicative Inverse.
+```
+
+---
+
+# Why Must The Denominator Be Odd?
+
+Earlier we removed every factor of
+
+```text
+2.
+```
+
+This was not an optimization.
+
+It was a mathematical requirement.
+
+A modular inverse modulo
+
+```text
+2²⁵⁶
+```
+
+exists only if
+
+```text
+gcd(denominator, 2²⁵⁶) = 1.
+```
+
+Since
+
+```text
+2²⁵⁶
+```
+
+contains only factors of
+
+```text
+2,
+```
+
+the denominator must contain **no factor of two.**
+
+In other words,
+
+it must be
+
+```text
+Odd.
+```
+
+That is exactly why we removed all powers of two in the previous section.
+
+---
+
+# The Journey So Far
+
+Originally
+
+```text
+512-bit Numerator
+
+↓
+
+Remove remainder
+
+↓
+
+Exact division
+
+↓
+
+Remove powers of two
+
+↓
+
+Odd denominator
+
+↓
+
+Shift upper bits into lower bits
+
+↓
+
+256-bit Numerator
+
+÷
+
+Odd Denominator
+```
+
+Now,
+
+for the first time,
+
+the modular inverse can be computed.
+
+Everything before this point was simply preparing the problem for this mathematical trick.
+
+---
+
+# Key Takeaways
+
+* The EVM cannot directly perform a 512-bit ÷ 256-bit division.
+
+* Ordinary division can be rewritten as multiplication by a reciprocal.
+
+* Solidity cannot represent fractional reciprocals such as `1/5`.
+
+* Instead, OpenZeppelin computes a **modular inverse**, an integer satisfying:
+
+  ```
+  denominator × inverse ≡ 1 (mod 2²⁵⁶)
+  ```
+
+* Multiplying by this modular inverse has the same effect as dividing by the denominator within modulo `2²⁵⁶`.
+
+* The denominator must be odd; otherwise, a modular inverse does not exist.
+
+---
+
+# Flow So Far
+
+```text
+512-bit Product
+        ↓
+Remove Remainder
+        ↓
+Exact Division
+        ↓
+Remove Powers Of Two
+        ↓
+Denominator Becomes Odd
+        ↓
+Shift Upper Bits Into LowerPart
+        ↓
+256-bit Numerator
+        ↓
+Compute Modular Inverse
+        ↓
+Replace Division With Multiplication
+```
