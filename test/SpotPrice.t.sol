@@ -114,11 +114,11 @@ contract SpotPriceTest is Test {
      *
      *          1875.705671124314989654 USDC per WETH
      */
-    function test_getSpotPriceFromSqrtPriceX96() public {
+    function test_getSpotPriceFromSqrtPriceX96() public view {
         uint256 price = 0;
-        IUV3Pool.Slot0 memory slot0 = poolIUV3.slot0();
+        (uint160 sqrtPriceX96,,,,,,) = poolIUV3.slot0();
 
-        price = MyCustomFullMath.mulDiv(slot0.sqrtPriceX96, slot0.sqrtPriceX96, Q96);
+        price = MyCustomFullMath.mulDiv(sqrtPriceX96, sqrtPriceX96, Q96);
         price = 1e12 * 1e18 * Q96 / price;
 
         assertGt(price, 0, "price = 0");

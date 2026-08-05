@@ -18,18 +18,18 @@ interface IUniswapV3PoolState {
     /// Encoded as two 4 bit values, where the protocol fee of token1 is shifted 4 bits and the protocol fee of token0
     /// is the lower 4 bits. Used as the denominator of a fraction of the swap fee, e.g. 4 means 1/4th of the swap fee.
     /// unlocked Whether the pool is currently locked to reentrancy
-    /*  function slot0()
-          external
-          view
-          returns (
-              uint160 sqrtPriceX96,
-              int24 tick,
-              uint16 observationIndex,
-              uint16 observationCardinality,
-              uint16 observationCardinalityNext,
-              uint8 feeProtocol,
-              bool unlocked
-          );*/
+    function slot0()
+        external
+        view
+        returns (
+            uint160 sqrtPriceX96,
+            int24 tick,
+            uint16 observationIndex,
+            uint16 observationCardinality,
+            uint16 observationCardinalityNext,
+            uint8 feeProtocol,
+            bool unlocked
+        );
     /* /// @notice The fee growth as a Q128.128 fees of token0 collected per unit of liquidity for the entire life of the pool
      /// @dev This value can overflow the uint256
      function feeGrowthGlobal0X128() external view returns (uint256);
@@ -112,5 +112,4 @@ interface IUniswapV3PoolState {
              uint160 secondsPerLiquidityCumulativeX128,
              bool initialized
          );*/
-
-    }
+}
