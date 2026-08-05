@@ -2,7 +2,7 @@
 pragma solidity ^0.8.20;
 
 //import './pool/IUniswapV3PoolImmutables.sol';
-import {IUniswapV3PoolState} from "contracts/coreUV3/Interfaces/pool/IUniswapV3PoolState.sol";
+import {IUV3PoolState} from "contracts/coreUV3/Interfaces/pool/IUV3PoolState.sol";
 
 //import './pool/IUniswapV3PoolDerivedState.sol';
 //import './pool/IUniswapV3PoolActions.sol';
@@ -15,5 +15,5 @@ import {IUniswapV3PoolState} from "contracts/coreUV3/Interfaces/pool/IUniswapV3P
 /// @dev The pool interface is broken up into many smaller pieces
 interface IUV3Pool is
 
-    IUniswapV3PoolState
+    IUV3PoolState
 {}
