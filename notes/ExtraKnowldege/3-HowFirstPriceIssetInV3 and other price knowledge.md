@@ -476,3 +476,412 @@ Continue Swap
 - Swaps move the **Current Tick** left or right.
 - Whenever the Current Tick crosses an initialized tick, `liquidityNet` is applied to update the Active Liquidity.
 - The creator only sets the **starting price once**. From that point onward, the market determines the price.
+
+---
+---
+---
+# Extra Knowledge — Does a Uniswap V3 Pool Have a Price Orientation?
+
+---
+
+> ## 💡 Why Read This?
+>
+> While learning Uniswap V3, many people naturally think of markets like:
+>
+> - ETH/USDC
+> - BTC/USD
+> - EUR/USD
+>
+> This often leads to an important question:
+>
+> > **When someone creates a Uniswap V3 pool, are they creating a "WETH priced in USDC" pool or a "USDC priced in WETH" pool?**
+>
+> The answer is **no**, and understanding why will make the rest of Uniswap V3 much easier.
+
+---
+
+# The Question
+
+Suppose Alice creates a pool containing
+
+```text
+WETH
+
+USDC
+```
+
+Did she create
+
+```text
+A WETH priced in USDC pool?
+```
+
+or
+
+```text
+A USDC priced in WETH pool?
+```
+
+Neither.
+
+She simply created
+
+```text
+A pool between WETH and USDC.
+```
+
+The pool itself has **no economic opinion** about which token should be considered the "main" asset.
+
+---
+
+# The Pool Is Neutral
+
+Think of the pool as a container.
+
+```text
+┌─────────────────────┐
+│                     │
+│      WETH           │
+│         +           │
+│      USDC           │
+│                     │
+└─────────────────────┘
+```
+
+That's all the pool knows.
+
+It does **not** think
+
+> "I'm an ETH-priced-in-USDC pool."
+
+Nor does it think
+
+> "I'm a USDC-priced-in-ETH pool."
+
+It simply holds a relationship between two assets.
+
+---
+
+# Then Why Do Humans Say
+
+```text
+1 ETH = 2000 USDC
+```
+
+Because **humans** like quoting prices that way.
+
+For example, we naturally say
+
+```text
+ETH/USD
+
+BTC/USD
+
+EUR/USD
+```
+
+Those are **human market conventions.**
+
+The pool itself doesn't care.
+
+---
+
+# Child Analogy — A Box Of Fruits
+
+Imagine a box containing
+
+```text
+🍎 Apples
+
+🍊 Oranges
+```
+
+Does the box think
+
+> "I'm an Apple priced in Orange box."
+
+❌ No.
+
+Or
+
+> "I'm an Orange priced in Apple box."
+
+❌ No.
+
+It's simply
+
+```text
+Apple
+
++
+
+Orange
+```
+
+Now suppose someone asks
+
+> "How many oranges equal one apple?"
+
+That's **your question**, not the box's.
+
+The box is completely neutral.
+
+A Uniswap pool behaves exactly the same way.
+
+---
+
+# So Where Does
+
+```text
+1 ETH = 2000 USDC
+```
+
+Come From?
+
+When the pool is initialized,
+
+the creator chooses an **initial exchange ratio.**
+
+For example,
+
+they might say
+
+```text
+1 ETH = 2000 USDC
+```
+
+This is **not naming the pool.**
+
+It is simply telling the protocol
+
+> **"Start this market at this exchange rate."**
+
+The protocol then converts that exchange ratio into its internal representation.
+
+---
+
+# The Pool Stores A Relationship
+
+Think of the relationship like this.
+
+```text
+ETH
+
+⇄
+
+USDC
+```
+
+Not
+
+```text
+ETH
+
+↓
+
+USDC
+```
+
+or
+
+```text
+USDC
+
+↓
+
+ETH
+```
+
+The pool stores a relationship between the two assets.
+
+---
+
+# The Same Market Can Be Written Two Ways
+
+Suppose
+
+```text
+1 ETH = 2000 USDC
+```
+
+The exact same market can also be written as
+
+```text
+1 USDC = 0.0005 ETH
+```
+
+Both statements describe **the exact same exchange rate.**
+
+Nothing about the market changed.
+
+Only the way humans chose to write it changed.
+
+---
+
+# Child Analogy — Distance
+
+Imagine I ask
+
+> "How many meters are in one kilometer?"
+
+You answer
+
+```text
+1000
+```
+
+Now I ask
+
+> "How many kilometers are in one meter?"
+
+You answer
+
+```text
+0.001
+```
+
+Did the distance change?
+
+No.
+
+Only the way we described it changed.
+
+Exactly the same thing happens with token prices.
+
+---
+
+# What Does The Protocol Actually Care About?
+
+Internally,
+
+Uniswap only cares about values like
+
+```text
+token0
+
+token1
+
+Current Tick
+
+sqrtPriceX96
+```
+
+These values allow the protocol to perform all mathematical calculations.
+
+The protocol does **not** store concepts like
+
+```text
+ETH priced in USDC
+```
+
+or
+
+```text
+USDC priced in ETH
+```
+
+Those are simply human interpretations.
+
+---
+
+# What Is The Creator Actually Choosing?
+
+When Alice creates the pool,
+
+she is **not** saying
+
+> "This is a WETH priced in USDC pool."
+
+Instead,
+
+she is saying
+
+> "Create a market between WETH and USDC."
+
+Then,
+
+during initialization,
+
+she chooses the starting exchange ratio.
+
+For example,
+
+```text
+1 ETH = 2000 USDC
+```
+
+The protocol converts that ratio into
+
+- `sqrtPriceX96`
+- Current Tick
+
+and stores those values internally.
+
+---
+
+# Complete Picture
+
+```text
+Alice Creates Pool
+
+        │
+
+        ▼
+
+Pool Contains
+
+WETH + USDC
+
+        │
+
+        ▼
+
+Alice Chooses
+
+Initial Exchange Rate
+
+1 ETH = 2000 USDC
+
+        │
+
+        ▼
+
+Protocol Converts It To
+
+sqrtPriceX96
+
+Current Tick
+
+        │
+
+        ▼
+
+Liquidity Providers Add Liquidity
+
+        │
+
+        ▼
+
+Users Start Swapping
+
+        │
+
+        ▼
+
+The Market Determines Future Prices
+```
+
+---
+
+# 📝 Key Takeaways
+
+- A Uniswap V3 pool is **not** a "WETH priced in USDC" pool.
+- A Uniswap V3 pool is **not** a "USDC priced in WETH" pool.
+- The pool is simply a market between two tokens.
+- Humans describe the market using familiar price quotes such as:
+  - `1 ETH = 2000 USDC`
+  - `1 USDC = 0.0005 ETH`
+- Both price quotes describe the **same market**.
+- During initialization, the creator chooses only the **starting exchange ratio**, not the "orientation" of the pool.
+- Internally, the protocol stores mathematical values (`sqrtPriceX96`, Current Tick, `token0`, `token1`) rather than human-readable price descriptions.
+- After initialization, the market price is determined entirely by swaps.
