@@ -885,3 +885,4 @@ The Market Determines Future Prices
 - During initialization, the creator chooses only the **starting exchange ratio**, not the "orientation" of the pool.
 - Internally, the protocol stores mathematical values (`sqrtPriceX96`, Current Tick, `token0`, `token1`) rather than human-readable price descriptions.
 - After initialization, the market price is determined entirely by swaps.
+>Note:Best of luck come back here when you get confused when deep diving the notes etc, Happned to me. Whenever yougo detailed deep diving sometimes you forget or get confused with the basic knowldge so this clock backs in atleast for me. hope this helps.
