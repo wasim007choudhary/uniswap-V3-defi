@@ -1201,3 +1201,431 @@ This situation only occurs in **Exact In** when the swap stops **before** reachi
 So, `computeSwapStep()` is **not using two different fee systems**.
 
 It is simply choosing the **most efficient way** to calculate the **exact same fee**, depending on which values are already available.
+
+---
+---
+
+# 💡 Extra Note — `computeSwapStep()` Only Handles One Liquidity Range
+
+While studying `computeSwapStep()`, I had an important question.
+
+> **Does this function handle the entire swap across multiple liquidity providers and multiple ticks, or does it only handle one liquidity range?**
+
+The answer is:
+
+> **It only handles one active liquidity range (one swap step).**
+
+This is one of the most important concepts to understand before studying `UniswapV3Pool.swap()`.
+
+---
+
+# Think Of It Like This
+
+Suppose we have two liquidity positions.
+
+```text
+Tick10 -------- Tick20 -------- Tick30
+
+        L1             L2
+```
+
+Assume the current price is somewhere between
+
+```text
+Tick10 → Tick20
+```
+
+Therefore,
+
+the current active liquidity is
+
+```text
+L1
+```
+
+Now suppose a trader performs a very large swap.
+
+A common question is:
+
+> **Does `computeSwapStep()` move the price through all of these liquidity ranges by itself?**
+
+For example,
+
+```text
+Tick10
+
+↓
+
+Tick20
+
+↓
+
+Cross Tick
+
+↓
+
+Update Liquidity
+
+↓
+
+Tick30
+
+↓
+
+Cross Tick
+
+↓
+
+Update Liquidity
+```
+
+**No.**
+
+It never does all of that.
+
+---
+
+# What Does `computeSwapStep()` Actually Do?
+
+Its job is much simpler.
+
+It only asks one question.
+
+> **"Given the current active liquidity, how far can I move the price?"**
+
+That's it.
+
+It computes **one swap step**.
+
+For example,
+
+```text
+Current Price
+
+↓
+
+Can I reach Tick20?
+
+↓
+
+YES
+```
+
+It then returns
+
+- `sqrtRatioNextX96`
+- `amountIn`
+- `amountOut`
+- `feeAmount`
+
+and stops.
+
+It does **not** cross the tick.
+
+It does **not** update the liquidity.
+
+It does **not** activate the next liquidity position.
+
+Its work is finished.
+
+---
+
+# Then Who Crosses The Tick?
+
+The caller.
+
+Specifically,
+
+```solidity
+UniswapV3Pool.swap()
+```
+
+contains a loop that repeatedly calls
+
+```solidity
+computeSwapStep()
+```
+
+Conceptually,
+
+it looks something like this.
+
+```text
+while (amountRemaining > 0)
+{
+    computeSwapStep();
+
+    if (Reached Target Tick)
+    {
+        Tick.cross();
+
+        liquidity += liquidityNet;
+    }
+}
+```
+
+Notice how the responsibilities are separated.
+
+---
+
+# Responsibility Of `computeSwapStep()`
+
+```text
+Current Liquidity
+
+↓
+
+Current Price
+
+↓
+
+Target Tick
+
+↓
+
+Compute
+
+• Next Price
+• Amount In
+• Amount Out
+• Fee
+```
+
+It knows **nothing** about future liquidity.
+
+---
+
+# Responsibility Of `swap()`
+
+```text
+Call computeSwapStep()
+
+↓
+
+Reached Target Tick?
+
+↓
+
+YES
+
+↓
+
+Tick.cross()
+
+↓
+
+Update Active Liquidity
+
+↓
+
+Find Next Initialized Tick
+
+↓
+
+Call computeSwapStep() Again
+```
+
+This process repeats until the entire swap is finished.
+
+---
+
+# 👶 Child Analogy — Walking Across Bridges
+
+Imagine there are several bridges.
+
+```text
+Bridge 1
+
+↓
+
+Bridge 2
+
+↓
+
+Bridge 3
+```
+
+The engineer responsible for Bridge 1 only worries about one thing.
+
+```text
+Start
+
+↓
+
+Walk Across MY Bridge
+
+↓
+
+Stop At The End
+```
+
+He doesn't care
+
+where you go next.
+
+Another engineer is responsible for Bridge 2.
+
+Another engineer is responsible for Bridge 3.
+
+Exactly the same thing happens here.
+
+Each active liquidity range is like one bridge.
+
+`computeSwapStep()` only walks across **one bridge**.
+
+`swap()` keeps calling it until the trader reaches the final destination.
+
+---
+
+# The Function Signature Also Tells Us This
+
+Notice the parameters accepted by `computeSwapStep()`.
+
+```solidity
+sqrtRatioCurrentX96
+
+sqrtRatioTargetX96
+
+liquidity
+
+amountRemaining
+
+feePips
+```
+
+Notice what is **missing**.
+
+There is no
+
+```solidity
+Tick[]
+```
+
+There is no
+
+```solidity
+mapping(int24 => Tick)
+```
+
+There is no
+
+```solidity
+nextLiquidity
+```
+
+There is no
+
+```solidity
+liquidityNet
+```
+
+This tells us something important.
+
+The function only has enough information to compute
+
+**one liquidity interval**.
+
+It has absolutely no knowledge of
+
+- future ticks,
+- other liquidity providers,
+- future active liquidity,
+- `Tick.cross()`,
+- or `liquidityNet`.
+
+Those are all handled by `UniswapV3Pool.swap()`.
+
+---
+
+# Complete Flow
+
+The entire swap process looks like this.
+
+```text
+swap()
+
+↓
+
+Find Next Initialized Tick
+
+↓
+
+Current Active Liquidity = L
+
+↓
+
+computeSwapStep()
+
+↓
+
+Reached Target Tick?
+
+│
+├── No
+│      ↓
+│   Swap Finished
+│
+└── Yes
+       ↓
+   Tick.cross()
+
+       ↓
+Active Liquidity += liquidityNet
+
+       ↓
+Find Next Initialized Tick
+
+       ↓
+computeSwapStep()
+
+       ↓
+Repeat...
+```
+
+The loop continues until
+
+```text
+amountRemaining = 0
+```
+
+or the requested output has been completely satisfied.
+
+---
+
+# 🎯 Final Mental Model
+
+`computeSwapStep()` is intentionally designed to solve **only one problem**.
+
+> **Given the current active liquidity and the next initialized tick, compute one swap step.**
+
+It never crosses ticks.
+
+It never updates liquidity.
+
+It never activates the next liquidity position.
+
+Those responsibilities belong to
+
+```solidity
+UniswapV3Pool.swap()
+```
+
+which repeatedly calls `computeSwapStep()`, crosses initialized ticks using `Tick.cross()`, updates the active liquidity using `liquidityNet`, and continues until the entire swap is complete.
+
+---
+
+# 📝 Key Takeaways
+
+- `computeSwapStep()` only handles **one active liquidity range**.
+- It computes:
+  - the next price,
+  - the input amount,
+  - the output amount,
+  - and the swap fee.
+- It does **not**:
+  - cross initialized ticks,
+  - update active liquidity,
+  - apply `liquidityNet`,
+  - or activate the next liquidity position.
+- Those responsibilities belong to `UniswapV3Pool.swap()`.
+- `swap()` repeatedly calls `computeSwapStep()` until the entire swap has been completed.
