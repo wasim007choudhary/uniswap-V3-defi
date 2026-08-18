@@ -435,7 +435,7 @@ library MyCustomFullMath {
      * Thrown when rounding the result up by one would overflow uint256.
      *
      *  ---------------------------------------------------------------------------------------------------------------------------------------------------
-     *  @custom:visit- notes/CoreLib/MyCustomFullMath/3-MulDivRoundUp.md for a complete reverse engineering of the mulDivRoundUp function.
+     *  @custom:visit- notes/CoreLib/MyCustomFullMath/3-MulDivRoundUp.md for a complete reverse engineering/dissection of the mulDivRoundUp function.
      *  ---------------------------------------------------------------------------------------------------------------------------------------------------
      */
     function mulDivRoundUp(uint256 x, uint256 y, uint256 denominator) internal pure returns (uint256 result) {
