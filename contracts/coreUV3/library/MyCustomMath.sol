@@ -7,6 +7,8 @@ pragma solidity ^0.8.20;
 ///@dev please read notes/CoreLibFunctions/Math.md to get the full dissecton of the original lib and why we wrote our own.
 
 ///@notice You are wondering why same function names and wont it cause issue but here is the answer - Solidity allows function overloading, so having the same function name is fine as long as the parameter types/signatures are different.
+
+///@dev Uniswap named their library LowGasSafeMath.sol but we named it MyCustomMath.sol to avoid confusion with the original library
 library MyCustomMath {
     /////// unSigned Intergers ///////
     function add(uint256 x, uint256 y) internal pure returns (uint256 z) {
