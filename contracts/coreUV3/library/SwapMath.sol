@@ -103,8 +103,83 @@ library SwapMath {
                 );
             }
         }
+        ///////////////////////////////////////////////////////////////
 
         bool max = nextSqrtRatioPriceX96 == targetSqrtRatioPriceX96;
+        // `max = true`  → we reached the target price.
+        // `max = false` → we stopped before the target at an intermediate price.
+
+        if (zeroForOne) {
+            // `zeroForOne = true` → Token0 → Token1.
+            // Token0 is INPUT and Token1 is OUTPUT.
+            // Price moves downward.
+
+            if (max && exactIn) {
+                // We reached the target AND this is Exact In.
+                // `amountIn` was already calculated for the full
+                // Current → Target movement, so keep that value.
+                amountIn = amountIn;
+            } else {
+                // Otherwise, calculate the Token0 input for the
+                // ACTUAL Current → Next price movement.
+                // `true` = round UP because this is an input amount.
+                amountIn =
+                    SqrtPriceMath.getAmount0Delta(nextSqrtRatioPriceX96, currentSqrtRatioPriceX96, liquidity, true);
+            }
+
+            if (max && !exactIn) {
+                // We reached the target AND this is Exact Out.
+                // `amountOut` was already calculated for the full
+                // Current → Target movement, so keep that value.
+                amountOut = amountOut;
+            } else {
+                // Otherwise, calculate the Token1 output for the
+                // ACTUAL Current → Next price movement.
+                // `false` = round DOWN because this is an output amount.
+                amountOut =
+                    SqrtPriceMath.getAmount1Delta(currentSqrtRatioPriceX96, nextSqrtRatioPriceX96, liquidity, false);
+            }
+        } else {
+            // `zeroForOne = false` → Token1 → Token0.
+            // Token1 is INPUT and Token0 is OUTPUT.
+            // Price moves upward.
+
+            if (max && exactIn) {
+                // We reached the target AND this is Exact In.
+                // `amountIn` was already calculated for the full
+                // Current → Target movement, so keep that value.
+                amountIn = amountIn;
+            } else {
+                // Otherwise, calculate the Token1 input for the
+                // ACTUAL Current → Next price movement.
+                // `true` = round UP because this is an input amount.
+                amountIn =
+                    SqrtPriceMath.getAmount1Delta(nextSqrtRatioPriceX96, currentSqrtRatioPriceX96, liquidity, true);
+            }
+
+            if (max && !exactIn) {
+                // We reached the target AND this is Exact Out.
+                // `amountOut` was already calculated for the full
+                // Current → Target movement, so keep that value.
+                amountOut = amountOut;
+            } else {
+                // Otherwise, calculate the Token0 output for the
+                // ACTUAL Current → Next price movement.
+                // `false` = round DOWN because this is an output amount.
+                amountOut =
+                    SqrtPriceMath.getAmount0Delta(currentSqrtRatioPriceX96, nextSqrtRatioPriceX96, liquidity, false);
+            }
+        }
+        //////////////////////////////////////////////////////////
+        if (!exactIn && amountOut > uint256(-amountRemaining)) {
+            amountOut = uint256(-amountRemaining);
+        }
+        if (exactIn && nextSqrtRatioPriceX96 != targetSqrtRatioPriceX96) {
+            feeAmountTaken = uint256(amountRemaining) - amountIn;
+        } else {
+            // If we reached the target price, the fee amount taken is simply the difference between the input and output amounts.
+            feeAmountTaken = MyCustomFullMath.mulDivRoundUp(amountIn, feePips, 1e6 - feePips);
+        }
     }
 }
 
