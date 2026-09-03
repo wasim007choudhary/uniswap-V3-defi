@@ -492,6 +492,7 @@ library SqrtPriceMath {
         }
     }
 
+    //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     /**
      * @notice Calculates the next sqrt price after adding or removing token1.
      *
@@ -553,6 +554,44 @@ library SqrtPriceMath {
         }
     }
 
+    //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    /**
+     * @notice Calculates the next sqrt price for an Exact Input swap.
+     *
+     * @dev The trader gives us a known amount of input tokens, and this function
+     *      calculates how far the sqrt price should move because of that input.
+     *
+     *      It does not calculate the whole swap and does not search for ticks.
+     *      It only chooses the correct token-specific price calculation:
+     *
+     *      - If `zeroForOne` is true:
+     *        token0 is being given to the pool, so token0 is added.
+     *        The sqrt price moves down.
+     *
+     *      - If `zeroForOne` is false:
+     *        token1 is being given to the pool, so token1 is added.
+     *        The sqrt price moves up.
+     *
+     *      The underlying functions handle the required rounding so that the
+     *      calculated price does not incorrectly move past the target price.
+     *
+     * @param sqrtPriceQ96 The current sqrt price, stored in Q64.96 format.
+     * @param liquidity The active liquidity available at the current price.
+     * @param amount The amount of input tokens being given to the pool.
+     * @param zeroForOne True for a token0 → token1 swap; false for a token1 → token0 swap.
+     *
+     * @return The next sqrt price after applying the input amount.
+     *
+     * @custom:note `zeroForOne == true` means token0 enters the pool and the
+     *      sqrt price moves down.
+     *
+     * @custom:note `zeroForOne == false` means token1 enters the pool and the
+     *      sqrt price moves up.
+     *
+     * @custom:deep-dive For the complete line-by-line dissection, examples,
+     *      rounding explanation, and full reasoning, visit:
+     *      `notes/CoreLibFunctions/SqrtPriceMath/4.SPM__fun3.md`
+     */
     function getNextSqrtPriceFromInput(uint160 sqrtPriceQ96, uint128 liquidity, uint256 amount, bool zeroForOne)
         internal
         pure
@@ -568,6 +607,44 @@ library SqrtPriceMath {
         }
     }
 
+    //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    /**
+     * @notice Calculates the next sqrt price for an Exact Output swap.
+     *
+     * @dev The trader asks for a known amount of output tokens, and this function
+     *      calculates how far the sqrt price must move to produce that output.
+     *
+     *      It does not calculate the whole swap and does not search for ticks.
+     *      It only chooses the correct token-specific price calculation:
+     *
+     *      - If `zeroForOne` is true:
+     *        token1 is leaving the pool, so token1 is removed.
+     *        The sqrt price moves down.
+     *
+     *      - If `zeroForOne` is false:
+     *        token0 is leaving the pool, so token0 is removed.
+     *        The sqrt price moves up.
+     *
+     *      The underlying functions handle the required rounding so that the
+     *      calculated price moves far enough to produce the requested output.
+     *
+     * @param sqrtPriceQ96 The current sqrt price, stored in Q64.96 format.
+     * @param liquidity The active liquidity available at the current price.
+     * @param amount The amount of output tokens being requested.
+     * @param zeroForOne True for a token0 → token1 swap; false for a token1 → token0 swap.
+     *
+     * @return The next sqrt price required to produce the requested output amount.
+     *
+     * @custom:note `zeroForOne == true` means token1 leaves the pool and the
+     *      sqrt price moves down.
+     *
+     * @custom:note `zeroForOne == false` means token0 leaves the pool and the
+     *      sqrt price moves up.
+     *
+     * @custom:deep-dive For the complete line-by-line dissection, examples,
+     *      rounding explanation, and full reasoning, visit:
+     *      `notes/CoreLibFunctions/SqrtPriceMath/5.SPM__fun4.md`
+     */
     function getNextSqrtPriceFromOutput(uint160 sqrtPriceQ96, uint128 liquidity, uint256 amount, bool zeroForOne)
         internal
         pure
@@ -583,22 +660,219 @@ library SqrtPriceMath {
         }
     }
 
+    //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    /**
+     * @notice Calculates the amount of token0 required or returned when the
+     *         sqrt price moves between two prices for a given amount of liquidity.
+     *
+     * @dev The function accepts the two sqrt prices in either order.
+     *      If A is greater than B, we swap them so that:
+     *
+     *          A = lower sqrt price
+     *          B = upper sqrt price
+     *
+     *      This gives us a predictable order for the formula:
+     *
+     *          liquidity / sqrt(lower) - liquidity / sqrt(upper)
+     *
+     *      which is mathematically equivalent to:
+     *
+     *          liquidity × (sqrt(upper) - sqrt(lower))
+     *          ──────────────────────────────────────────
+     *                  sqrt(upper) × sqrt(lower)
+     *
+     *      The prices are stored in Q64.96 format, so the liquidity is scaled
+     *      by 2^96 before the FullMath calculation.
+     *
+     *      When `roundUp` is true, the amount is rounded upward so that the
+     *      calculated token0 amount is never underestimated.
+     *
+     *      When `roundUp` is false, the amount is rounded downward so that the
+     *      calculated token0 amount is never overestimated.
+     *
+     *      FullMath is used because the multiplication can require more than
+     *      256 bits even though the final result fits within uint256.
+     *
+     * @param sqrtAQ96 One of the two sqrt prices, stored in Q64.96 format.
+     * @param sqrtBQ96 The other sqrt price, stored in Q64.96 format.
+     * @param liquidity The amount of liquidity used for this price movement.
+     * @param roundUp True to round the token0 amount up; false to round it down.
+     *
+     * @return amount0 The calculated amount of token0 for the price movement.
+     *
+     * @custom:note The two sqrt prices can be passed in either order.
+     *      The function normalizes them internally so A is always lower
+     *      and B is always higher.
+     *
+     * @custom:note For `roundUp == true`, the calculation uses rounding up
+     *      because the amount must not be underestimated.
+     *
+     * @custom:note For `roundUp == false`, the calculation uses rounding down
+     *      because the amount must not be overestimated.
+     *
+     * @custom:deep-dive For the complete line-by-line dissection, formula
+     *      derivation, price-ordering explanation, FullMath analysis,
+     *      rounding logic, and examples, visit:
+     *      `notes/CoreLibFunctions/SqrtPriceMath/6.SPM__fun5.md`
+     */
     function getAmount0Delta(uint160 sqrtAQ96, uint160 sqrtBQ96, uint128 liquidity, bool roundUp)
         internal
         pure
         returns (uint256 amount0)
     {
+        /**
+         * A and B can arrive in either order.
+         *  We want A to always be the smaller sqrt price
+         *  and B to always be the bigger sqrt price.
+         *
+         *  Example:
+         *
+         *      A = 500
+         *      B = 300
+         *
+         *  Since A > B, swap them:
+         *
+         *      A = 300  ← lower
+         *      B = 500  ← upper
+         *
+         *  From this point onward:
+         *
+         *      sqrtAQ96 = lower sqrt price
+         *      sqrtBQ96 = upper sqrt price
+         *
+         *  We do this because the formula is written using
+         *  lower and upper prices in this order.
+         */
         if (sqrtAQ96 > sqrtBQ96) {
-            (uint160 sqrtAQ96, uint160 sqrtBQ96) = (sqrtBQ96, sqrtAQ96); // we made A smaller and b bigger , did it for the formula to work, now from here onwards a will A always be smaller as we swapped in if condition
-
-            // Calculates liquidity / sqrt(lower) - liquidity / sqrt(upper),
-            /// i.e. liquidity * (sqrt(upper) - sqrt(lower)) / (sqrt(upper) * sqrt(lower))
-
-            uint256 numerator1 = uint256(liquidity) << FixedPointQ96.RESOLUTION;
-            uint256 numerator2 = sqrtBQ96 - sqrtAQ96;
-
-            //now check the samller price if bigger than 0, if it is then the bigger obiously....and that is why we didnt do the zero check earlier ...we would have need to do 2 if we did it before the swap if condition,here with 1 boom done
-            require(sqrtBQ96 > 0);
+            (sqrtAQ96, sqrtBQ96) = (sqrtBQ96, sqrtAQ96);
         }
+        /**
+         * The token0 formula is:
+         *
+         *      liquidity / sqrt(lower)
+         *      -
+         *      liquidity / sqrt(upper)
+         *
+         *  which can also be written as:
+         *
+         *      liquidity × (sqrt(upper) - sqrt(lower))
+         *      ──────────────────────────────────────────
+         *              sqrt(upper) × sqrt(lower)
+         *
+         *  Because the sqrt prices are stored in Q64.96 format,
+         *  we need to account for the 2^96 scaling.
+         *
+         *  `uint256(liquidity)` widens uint128 liquidity to uint256.
+         *
+         *  `<< FixedPointQ96.RESOLUTION` means:
+         *
+         *      liquidity × 2^96
+         *
+         *  because RESOLUTION = 96.
+         */
+        uint256 numerator1 = uint256(liquidity) << FixedPointQ96.RESOLUTION;
+        /**
+         * Since we normalized the prices above:
+         *
+         *      sqrtBQ96 >= sqrtAQ96
+         *
+         *  therefore:
+         *
+         *      sqrtBQ96 - sqrtAQ96
+         *
+         *  is the positive difference between the upper
+         *  and lower sqrt prices.
+         */
+        uint256 numerator2 = sqrtBQ96 - sqrtAQ96;
+        /**
+         * We eventually divide by the lower sqrt price.
+         *
+         *  Therefore the lower sqrt price must be greater than zero.
+         *
+         *  Because A is the smaller value after the swap:
+         *
+         *      sqrtAQ96 > 0
+         *
+         *  guarantees that the denominator is valid.
+         *
+         *  We check after the possible swap so we only need
+         *  one zero-price check or else befoire the swap we would need to check both prices A and B both for zero.
+         */
+        require(sqrtAQ96 > 0);
+        /**
+         * Now calculate the final token0 amount.
+         *
+         *  roundUp == true:
+         *
+         *     Round UP.
+         *
+         *  This means the amount is never underestimated.
+         *
+         *  The calculation is performed in two divisions:
+         *
+         *      (numerator1 × numerator2)
+         *      ─────────────────────────
+         *              sqrtBQ96
+         *
+         *  followed by:
+         *
+         *      result
+         *      ──────
+         *      sqrtAQ96
+         *
+         *  FullMath handles the potentially large multiplication
+         *  without losing the full intermediate precision.
+         *
+         *  UnsafeMath.divRoundingUp then ensures the final division
+         *  is also rounded upward.
+         *
+         *  So the round-up path intentionally uses TWO round-ups.
+         *
+         *  Example:
+         *
+         *      exact required amount = 100.7
+         *
+         *      round up = 101
+         *
+         *  The purpose is to avoid underestimating the amount.
+         *
+         *  roundUp == false:
+         *
+         *      Round DOWN.
+         *
+         *  This prevents the calculated amount from being overestimated.
+         *
+         *  Example:
+         *
+         *      exact output = 100.7
+         *
+         *
+         *       round down = 100
+         *
+         *  The pool therefore does not give more than the calculated amount.
+         */
+        return roundUp
+            ? MyCustomUnsafeMath.divRoundingUp(MyCustomFullMath.mulDiv(numerator1, numerator2, sqrtBQ96), sqrtAQ96)
+            : MyCustomFullMath.mulDiv(numerator1, numerator2, sqrtBQ96) / sqrtAQ96;
     }
+
+    //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    function getAmount1Delta(uint160 sqrtAQ96, uint160 sqrtBQ96, uint128 liquidity, bool roundUp)
+        internal
+        pure
+        returns (uint256 amount1)
+    {
+        if (sqrtAQ96 > sqrtBQ96) {
+            (sqrtAQ96, sqrtBQ96) = (sqrtBQ96, sqrtAQ96);
+        }
+        return roundUp
+            ? MyCustomFullMath.mulDivRoundUp(liquidity, sqrtBQ96 - sqrtAQ96, FixedPointQ96.Q96)
+            : MyCustomFullMath.mulDiv(liquidity, sqrtBQ96 - sqrtAQ96, FixedPointQ96.Q96);
+    }
+    //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 }
