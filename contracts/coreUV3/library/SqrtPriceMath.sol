@@ -588,14 +588,14 @@ library SqrtPriceMath {
         pure
         returns (uint256 amount0)
     {
-        if (sqrtBQ96 > sqrtAQ96) {
-            (uint160 sqrtBQ96, uint160 sqrtAQ96) = (sqrtAQ96, sqrtBQ96); // we made B smaller and A bigger , did it for the formula to work, now from here onwards B will always be smaller as we swapped oif B bigger condition
+        if (sqrtAQ96 > sqrtBQ96) {
+            (uint160 sqrtAQ96, uint160 sqrtBQ96) = (sqrtBQ96, sqrtAQ96); // we made A smaller and b bigger , did it for the formula to work, now from here onwards a will A always be smaller as we swapped in if condition
 
             // Calculates liquidity / sqrt(lower) - liquidity / sqrt(upper),
             /// i.e. liquidity * (sqrt(upper) - sqrt(lower)) / (sqrt(upper) * sqrt(lower))
 
             uint256 numerator1 = uint256(liquidity) << FixedPointQ96.RESOLUTION;
-            uint256 numerator2 = sqrtAQ96 - sqrtBQ96;
+            uint256 numerator2 = sqrtBQ96 - sqrtAQ96;
 
             //now check the samller price if bigger than 0, if it is then the bigger obiously....and that is why we didnt do the zero check earlier ...we would have need to do 2 if we did it before the swap if condition,here with 1 boom done
             require(sqrtBQ96 > 0);
