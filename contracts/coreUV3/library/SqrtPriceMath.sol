@@ -266,6 +266,9 @@ library SqrtPriceMath {
      * @param add          `true` when token0 is added, `false` when token0 is removed.
      *
      * @return sqrtPriceNextQ96 The resulting sqrt price encoded as Q64.96.
+     *
+     *@custom:deep-  For the complete line-by-line dissection, examples, and full reverse engineering, visit:
+     *  notes/CoreLibFunctions/SqrtPriceMath/2.SPM__fun1.md
      */
     function getNextSqrtPriceFromAmount0RoundingUp(uint160 sqrtPriceQ96, uint128 liquidity, uint256 amount, bool add)
         internal
@@ -524,9 +527,7 @@ library SqrtPriceMath {
      * @custom:note If token1 is removed, the sqrt price moves down.
      * @custom:note The final sqrt price is always rounded down.
      *
-     * @custom:deep-dive For the full line-by-line dissection, numerical examples,
-     * rounding intuition, branch analysis, and reverse engineering of this
-     * function, see:
+     * @custom:deep-  For comeplete line-by-line dissection, examples, and full reverse engineering, visit:
      * `notes/CoreLibFunctions/SqrtPriceMath/3.SPM__fun2.md`
      */
     function getNextSqrtPriceFromAmount1RoundingDown(uint160 sqrtPriceQ96, uint128 liquidity, uint256 amount, bool add)
@@ -588,8 +589,7 @@ library SqrtPriceMath {
      * @custom:note `zeroForOne == false` means token1 enters the pool and the
      *      sqrt price moves up.
      *
-     * @custom:deep-dive For the complete line-by-line dissection, examples,
-     *      rounding explanation, and full reasoning, visit:
+     * @custom:deep For the complete line-by-line dissection  and full reverse engineering, visit:
      *      `notes/CoreLibFunctions/SqrtPriceMath/4.SPM__fun3.md`
      */
     function getNextSqrtPriceFromInput(uint160 sqrtPriceQ96, uint128 liquidity, uint256 amount, bool zeroForOne)
@@ -641,8 +641,7 @@ library SqrtPriceMath {
      * @custom:note `zeroForOne == false` means token0 leaves the pool and the
      *      sqrt price moves up.
      *
-     * @custom:deep-dive For the complete line-by-line dissection, examples,
-     *      rounding explanation, and full reasoning, visit:
+     * @custom:deep-dive For the complete line-by-line dissection  and full reverse engineering, visit:
      *      `notes/CoreLibFunctions/SqrtPriceMath/5.SPM__fun4.md`
      */
     function getNextSqrtPriceFromOutput(uint160 sqrtPriceQ96, uint128 liquidity, uint256 amount, bool zeroForOne)
@@ -710,9 +709,7 @@ library SqrtPriceMath {
      * @custom:note For `roundUp == false`, the calculation uses rounding down
      *      because the amount must not be overestimated.
      *
-     * @custom:deep-dive For the complete line-by-line dissection, formula
-     *      derivation, price-ordering explanation, FullMath analysis,
-     *      rounding logic, and examples, visit:
+     * @custom:deep-dive For the complete line-by-line dissection with examples/curiosity/confusion breakdown and full reverse engineering, visit:
      *      `notes/CoreLibFunctions/SqrtPriceMath/6.SPM__fun5.md`
      */
     function getAmount0Delta(uint160 sqrtAQ96, uint160 sqrtBQ96, uint128 liquidity, bool roundUp)
@@ -858,6 +855,54 @@ library SqrtPriceMath {
 
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+    /**
+     * @notice Calculates the amount of token1 corresponding to the movement
+     *         between two sqrt prices for a given amount of liquidity.
+     *
+     * @dev The two sqrt prices can be provided in either order.
+     *      If `sqrtAQ96` is greater than `sqrtBQ96`, they are swapped so that:
+     *
+     *          sqrtAQ96 = lower sqrt price
+     *          sqrtBQ96 = upper sqrt price
+     *
+     *      This allows the calculation to always use:
+     *
+     *          liquidity × (upper - lower) / Q96
+     *
+     *      Because the sqrt prices are stored in Q64.96 format, dividing by
+     *      `FixedPointQ96.Q96` removes the 2^96 scaling from the price difference.
+     *
+     *      If `roundUp` is true, `mulDivRoundUp` is used so the calculated
+     *      amount1 is rounded upward and is never underestimated.
+     *
+     *      If `roundUp` is false, `mulDiv` is used so the calculated amount1
+     *      is rounded downward and is never overestimated.
+     *
+     *      `MyCustomFullMath` is used because the multiplication of liquidity
+     *      and the sqrt-price difference may require more than 256 bits
+     *      before the division is performed.
+     *
+     * @param sqrtAQ96 One of the two sqrt prices, stored in Q64.96 format.
+     * @param sqrtBQ96 The other sqrt price, stored in Q64.96 format.
+     * @param liquidity The amount of liquidity associated with the price movement.
+     * @param roundUp True to round the amount1 calculation up; false to round it down.
+     *
+     * @return amount1 The amount of token1 corresponding to the movement between
+     *         the two sqrt prices.
+     *
+     * @custom:note The function accepts the two sqrt prices in either order and
+     *      normalizes them so `sqrtAQ96` is the lower price and `sqrtBQ96` is the
+     *      upper price.
+     *
+     * @custom:note `roundUp == true` means the amount is rounded UP so it is not
+     *      underestimated.
+     *
+     * @custom:note `roundUp == false` means the amount is rounded DOWN so it is
+     *      not overestimated.
+     *
+     * @custom:deep-dive For the complete line-by-line dissection and full reverse engineering, visit:
+     *      `notes/CoreLibFunctions/SqrtPriceMath/7.SPM__fun6.md`
+     */
     function getAmount1Delta(uint160 sqrtAQ96, uint160 sqrtBQ96, uint128 liquidity, bool roundUp)
         internal
         pure
@@ -872,7 +917,17 @@ library SqrtPriceMath {
     }
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+function getAmount0Delta(uint160 sqrtPriceAX96, uint160 sqrtPriceBX96, int128 liquidity)
+        internal
+        pure
+        returns (int256 amount0)
+    {
+        return liquidity < 0
+            ?  -int256(getAmount0Delta(sqrtPriceAX96, sqrtPriceBX96, uint128(-liquidity), false));
+            : int256(getAmount0Delta(sqrtPriceAX96, sqrtPriceBX96, uint128(liquidity), true));
+    }
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 }
+
