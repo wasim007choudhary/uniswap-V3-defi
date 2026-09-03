@@ -552,4 +552,53 @@ library SqrtPriceMath {
             return uint160(sqrtPriceQ96 - quotient);
         }
     }
+
+    function getNextSqrtPriceFromInput(uint160 sqrtPriceQ96, uint128 liquidity, uint256 amount, bool zeroForOne)
+        internal
+        pure
+        returns (uint160)
+    {
+        require(sqrtPriceQ96 > 0);
+        require(liquidity > 0);
+
+        if (zeroForOne) {
+            return getNextSqrtPriceFromAmount0RoundingUp(sqrtPriceQ96, liquidity, amount, true);
+        } else {
+            return getNextSqrtPriceFromAmount1RoundingDown(sqrtPriceQ96, liquidity, amount, true);
+        }
+    }
+
+    function getNextSqrtPriceFromOutput(uint160 sqrtPriceQ96, uint128 liquidity, uint256 amount, bool zeroForOne)
+        internal
+        pure
+        returns (uint160)
+    {
+        require(sqrtPriceQ96 > 0);
+        require(liquidity > 0);
+
+        if (zeroForOne) {
+            return getNextSqrtPriceFromAmount1RoundingDown(sqrtPriceQ96, liquidity, amount, false);
+        } else {
+            return getNextSqrtPriceFromAmount0RoundingUp(sqrtPriceQ96, liquidity, amount, false);
+        }
+    }
+
+    function getAmount0Delta(uint160 sqrtAQ96, uint160 sqrtBQ96, uint128 liquidity, bool roundUp)
+        internal
+        pure
+        returns (uint256 amount0)
+    {
+        if (sqrtBQ96 > sqrtAQ96) {
+            (uint160 sqrtBQ96, uint160 sqrtAQ96) = (sqrtAQ96, sqrtBQ96); // we made B smaller and A bigger , did it for the formula to work, now from here onwards B will always be smaller as we swapped oif B bigger condition
+
+            // Calculates liquidity / sqrt(lower) - liquidity / sqrt(upper),
+            /// i.e. liquidity * (sqrt(upper) - sqrt(lower)) / (sqrt(upper) * sqrt(lower))
+
+            uint256 numerator1 = uint256(liquidity) << FixedPointQ96.RESOLUTION;
+            uint256 numerator2 = sqrtAQ96 - sqrtBQ96;
+
+            //now check the samller price if bigger than 0, if it is then the bigger obiously....and that is why we didnt do the zero check earlier ...we would have need to do 2 if we did it before the swap if condition,here with 1 boom done
+            require(sqrtBQ96 > 0);
+        }
+    }
 }
