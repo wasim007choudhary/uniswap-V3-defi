@@ -198,7 +198,7 @@ library SwapMath {
                 nextSqrtRatioPriceX96 = targetSqrtRatioPriceX96;
             } else {
                 nextSqrtRatioPriceX96 = SqrtPriceMath.getNextSqrtPriceFromInput(
-                    currentSqrtRatioPriceX96, amountRemainingAfterFeeDeduction, liquidity, zeroForOne
+                    currentSqrtRatioPriceX96, liquidity, amountRemainingAfterFeeDeduction, zeroForOne
                 );
             }
         } else {
@@ -259,7 +259,7 @@ library SwapMath {
                 nextSqrtRatioPriceX96 = targetSqrtRatioPriceX96;
             } else {
                 nextSqrtRatioPriceX96 = SqrtPriceMath.getNextSqrtPriceFromOutput(
-                    currentSqrtRatioPriceX96, uint256(-amountRemaining), liquidity, zeroForOne
+                    currentSqrtRatioPriceX96, liquidity, uint256(-amountRemaining), zeroForOne
                 );
             }
         }

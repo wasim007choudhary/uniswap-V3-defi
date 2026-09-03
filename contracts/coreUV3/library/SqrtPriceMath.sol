@@ -965,7 +965,7 @@ library SqrtPriceMath {
      * @custom:note The sign of `amount0` represents the direction of the token0
      *      delta, not the existence of a negative token balance.
      *
-     * @custom:deep dive For the complete line-by-line dissection, examples,
+     * @custom:deep For dive For the complete line-by-line dissection, examples,
      *      and full reverse engineering, visit:
      *      `notes/CoreLibFunctions/SqrtPriceMath/8.SPM__fun7.md`
      */
@@ -978,8 +978,61 @@ library SqrtPriceMath {
             ? -getAmount0Delta(sqrtAQ96, sqrtBQ96, uint128(-liquidity), false).toInt256()
             : getAmount0Delta(sqrtAQ96, sqrtBQ96, uint128(liquidity), true).toInt256();
     }
+
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+    /**
+     * @notice Calculates the signed amount of token1 corresponding to the
+     *         movement between two sqrt prices for a given signed liquidity.
+     *
+     * @dev If `liquidity` is positive, the function calculates the token1 delta
+     *      using the unsigned `getAmount1Delta()` function with `roundUp = true`.
+     *      The resulting amount is returned as a positive `int256`.
+     *
+     *      If `liquidity` is negative, the negative sign is temporarily removed
+     *      so the unsigned `getAmount1Delta()` function can calculate the
+     *      magnitude of the token1 amount using positive liquidity.
+     *
+     *      For negative liquidity, `roundUp = false` is used before the result
+     *      is converted to `int256` and negated. This preserves the correct
+     *      signed rounding direction.
+     *
+     *      Therefore:
+     *
+     *          liquidity > 0 → positive amount1 → round UP
+     *          liquidity < 0 → negative amount1 → round DOWN → negate
+     *
+     *      The sign of the returned `amount1` represents the direction of the
+     *      token1 delta. A negative amount does not mean that a negative token
+     *      balance exists; it represents the opposite direction of the token1
+     *      movement.
+     *
+     *      This function is an overload of `getAmount1Delta()` and reuses the
+     *      unsigned-liquidity version to perform the actual amount1 calculation.
+     *
+     * @param sqrtAQ96 One of the two sqrt prices, stored in Q64.96 format.
+     * @param sqrtBQ96 The other sqrt price, stored in Q64.96 format.
+     * @param liquidity The signed liquidity associated with the price movement.
+     *                   Positive liquidity represents an added liquidity
+     *                   contribution; negative liquidity represents a removed
+     *                   liquidity contribution.
+     *
+     * @return amount1 The signed amount of token1 corresponding to the movement
+     *                 between the two sqrt prices.
+     *
+     * @custom:note Positive liquidity returns a positive token1 delta and uses
+     *      upward rounding.
+     *
+     * @custom:note Negative liquidity returns a negative token1 delta. The
+     *      unsigned magnitude is rounded down before the negative sign is applied.
+     *
+     * @custom:note The sign of `amount1` represents the direction of the token1
+     *      delta, not the existence of a negative token balance.
+     *
+     * @custom:deep-dive For the complete line-by-line dissection, examples,
+     *      and full reverse engineering, visit:
+     *      `notes/CoreLibFunctions/SqrtPriceMath/9.SPM__fun8.md`
+     */
     function getAmount1Delta(uint160 sqrtAQ96, uint160 sqrtBQ96, int128 liquidity)
         internal
         pure
