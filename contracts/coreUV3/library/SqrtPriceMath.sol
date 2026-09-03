@@ -492,6 +492,42 @@ library SqrtPriceMath {
         }
     }
 
+    /**
+     * @notice Calculates the next sqrt price after adding or removing token1.
+     *
+     * @dev Token1 changes the sqrt price linearly:
+     *      sqrtPriceNext = sqrtPriceCurrent ± amount / liquidity.
+     *
+     *      When adding token1, the sqrt price increases and the quotient
+     *      is rounded down so the final sqrt price does not move above
+     *      the exact mathematical result.
+     *
+     *      When removing token1, the sqrt price decreases and the quotient
+     *      is rounded up so the final sqrt price does not remain above
+     *      the exact mathematical result.
+     *
+     *      For smaller amounts, the calculation uses a cheaper shift-and-divide
+     *      path. For larger amounts, FullMath is used to safely handle the
+     *      multiplication by Q96 without overflowing a uint256 intermediate.
+     *
+     *      The function always returns the final sqrt price rounded down.
+     *
+     * @param sqrtPriceQ96 The current sqrt price, stored in Q64.96 format.
+     * @param liquidity The amount of active liquidity available for this price movement.
+     * @param amount The amount of token1 being added or removed.
+     * @param add True when token1 is added; false when token1 is removed.
+     *
+     * @return The new sqrt price after the token1 amount is applied.
+     *
+     * @custom:note If token1 is added, the sqrt price moves up.
+     * @custom:note If token1 is removed, the sqrt price moves down.
+     * @custom:note The final sqrt price is always rounded down.
+     *
+     * @custom:deep-dive For the full line-by-line dissection, numerical examples,
+     * rounding intuition, branch analysis, and reverse engineering of this
+     * function, see:
+     * `notes/CoreLibFunctions/SqrtPriceMath/3.SPM__fun2.md`
+     */
     function getNextSqrtPriceFromAmount1RoundingDown(uint160 sqrtPriceQ96, uint128 liquidity, uint256 amount, bool add)
         internal
         pure
