@@ -13,5 +13,26 @@ library BitMath {
             x >>= 64;
             highest1BitPos += 64;
         }
+
+        if (x >= 0x100000000) {
+            x >>= 32;
+            highest1BitPos += 32;
+        }
+        if (x >= 0x10000) {
+            x >>= 16;
+            highest1BitPos += 16;
+        }
+        if (x >= 0x100) {
+            x >>= 8;
+            highest1BitPos += 8;
+        }
+        if (x >= 0x10) {
+            x >>= 4;
+            highest1BitPos += 4;
+        }
+        if (x >= 0x4) {
+            x >>= 2;
+            highest1BitPos += 2;
+        }
     }
 }
