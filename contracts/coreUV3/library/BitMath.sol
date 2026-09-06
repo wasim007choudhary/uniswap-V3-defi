@@ -68,4 +68,48 @@ library BitMath {
             highest1BitPos += 1;
         }
     }
+
+    function leastSignificantBit(uint256 x) internal pure returns (uint8 lowest1bitPos) {
+        require(x > 0);
+        lowest1bitPos = 255;
+
+        if (x & type(uint128).max > 0) {
+            lowest1bitPos -= 128;
+        } else {
+            x >>= 128;
+        }
+        if (x & type(uint64).max > 0) {
+            lowest1bitPos -= 64;
+        } else {
+            x >>= 64;
+        }
+        if (x & type(uint32).max > 0) {
+            lowest1bitPos -= 32;
+        } else {
+            x >>= 32;
+        }
+        if (x & type(uint16).max > 0) {
+            lowest1bitPos -= 16;
+        } else {
+            x >>= 16;
+        }
+        if (x & type(uint8).max > 0) {
+            lowest1bitPos -= 8;
+        } else {
+            x >>= 8;
+        }
+        if (x & 0xf > 0) {
+            lowest1bitPos -= 4;
+        } else {
+            x >>= 4;
+        }
+        if (x & 0x3 > 0) {
+            lowest1bitPos -= 2;
+        } else {
+            x >>= 2;
+        }
+        if (x & 0x1 > 0) {
+            lowest1bitPos -= 1;
+        }
+    }
 }
