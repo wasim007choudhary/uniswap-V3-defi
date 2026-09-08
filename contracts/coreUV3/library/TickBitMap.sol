@@ -4,6 +4,52 @@ pragma solidity ^0.8.20;
 
 import {BitMath} from "contracts/coreUV3/library/BitMath.sol";
 
+/**
+ * @title TickBitmap
+ * @notice Stores initialized ticks in a compact 256-bit bitmap and provides
+ *         functions for finding the next initialized tick within one bitmap word.
+ *
+ * @dev Each tick is compressed using the pool's `tickSpacing` and then mapped
+ *      to a specific `wordPos` and `bitPos`.
+ *
+ *      One `uint256` bitmap word stores the initialized/uninitialized state of
+ *      256 compressed tick positions:
+ *
+ *          bit = 1  → tick is initialized
+ *          bit = 0  → tick is not initialized
+ *
+ *      The library provides:
+ *
+ *      - `position()`:
+ *          Converts a compressed tick into its bitmap word position and bit
+ *          position.
+ *
+ *      - `flipTick()`:
+ *          Flips a tick's bitmap bit between initialized (`1`) and
+ *          uninitialized (`0`).
+ *
+ *      - `nextInitializedTickWithinOneWord()`:
+ *          Searches the bitmap for the nearest initialized tick either at/below
+ *          the current tick or strictly above it.
+ *
+ *      The next-tick search uses bit masks together with bitwise operations and
+ *      `BitMath` to efficiently locate the nearest initialized tick without
+ *      checking every tick one by one.
+ *
+ * @custom:see IMPORTANT:
+ *             Before studying or modifying this library, first read:
+ *
+ *              notes/5.TickBitmap & NextTickAlgo/1.Concetual
+ *
+ *      That conceptual section explains the complete TickBitmap and
+ *      Next-Tick algorithm, including bitmap structure, tick compression,
+ *      negative-tick handling, word/bit positions, bit masks, AND/NOT/XOR,
+ *      MSB/LSB searching, search direction, word boundaries, and edge cases.
+ *
+ *      Make sure the conceptual section is clear before continuing here,
+ *      because this code relies heavily on those concepts.
+ */
+
 library TickBitMap {
     /**
      * @notice Returns the bitmap word position and bit position for a given tick.
