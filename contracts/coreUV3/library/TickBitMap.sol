@@ -78,6 +78,54 @@ library TickBitMap {
         mapRef[wordPos] ^= mask;
     }
 
+    /**
+     * @notice Finds the next initialized tick within the current 256-bit bitmap word,
+     *         either at or below the given tick, or strictly above it.
+     *
+     * @dev The function first converts the given tick into a compressed tick using
+     *      `tickSpacing`. For negative, non-exactly-spaced ticks, the compressed value
+     *      is decreased by 1 so that it rounds toward negative infinity.
+     *
+     *      If `lessThanOrEqualTo` is true, the search includes the current compressed
+     *      tick and moves toward lower tick positions. The bitmap is masked so that
+     *      only the current bit and all lower bits remain. If an initialized bit is
+     *      found, the most significant set bit gives the nearest initialized tick.
+     *      If none is found, the lowest tick position of the current word is returned.
+     *
+     *      If `lessThanOrEqualTo` is false, the current tick is excluded and the
+     *      search starts from `compressed + 1`, moving toward higher tick positions.
+     *      The bitmap is masked so that only the starting bit and all higher bits
+     *      remain. If an initialized bit is found, the least significant set bit
+     *      gives the nearest initialized tick. If none is found, the highest tick
+     *      position of the current word is returned.
+     *
+     *      The returned `initialized` value tells whether `nextTick` is actually
+     *      initialized. When no initialized tick is found within the searched part
+     *      of the word, `nextTick` is a word boundary and `initialized` is false.
+     *
+     *      The function searches within at most one 256-bit bitmap word. Any movement
+     *      into an adjacent word is handled externally by the caller.
+     *
+     * @param mapRef The storage mapping containing the bitmap words. Each `int16`
+     *               word position maps to one `uint256` containing 256 tick states.
+     * @param tick The starting tick from which the search begins.
+     * @param tickSpacing The spacing between usable ticks. Used to convert the
+     *                    actual tick into its compressed bitmap position.
+     * @param lessThanOrEqualTo Determines the search direction:
+     *                          - `true`: search for the nearest tick less than or
+     *                            equal to `tick`.
+     *                          - `false`: search for the nearest tick strictly
+     *                            greater than `tick`.
+     *
+     * @return nextTick The nearest initialized tick found within the searched part
+     *                  of the bitmap word, or the corresponding word boundary when
+     *                  no initialized tick is found.
+     * @return initialized `true` if `nextTick` is initialized, otherwise `false`.
+     *
+     *
+     * @custom:dissection For complete line-by-line dissection and reverse-engineering, visit:
+     *      `notes/5.TickBitmap & NextTickAlgo/2.CodeBase/2.TickBitMap Library/3.nextInitializedTickWithinOneWord.md`
+     */
     function nextInitializedTickWithinOneWord(
         mapping(int16 => uint256) storage mapRef,
         int24 tick,
@@ -91,7 +139,7 @@ library TickBitMap {
         if (lessThanOrEqualTo) {
             (int16 wordPos, uint8 bitPos) = position(compressed);
 
-            uint256 mask = 1 << bitPos - 1 + (1 << bitPos);
+            uint256 mask = (1 << bitPos) - 1 + (1 << bitPos);
             uint256 masked = mapRef[wordPos] & mask;
             initialized = masked != 0;
             if (initialized) {
