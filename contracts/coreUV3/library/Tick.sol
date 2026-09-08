@@ -18,7 +18,7 @@ library Tick {
         ///         as either their lower or upper boundary.
         /// @dev This value can never be negative because it represents the
         ///      total amount of position liquidity referencing this tick.
-        uint128 liquidityGrossTotalOfTheTick;
+        uint128 liquidityGross;
 
         /// @notice The net change in active liquidity when this tick is crossed.
         /// @dev The value is signed because crossing a tick can either add or
@@ -77,4 +77,15 @@ library Tick {
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////
     ///////////////////////////////////////////////////////////////////////////////////////////////////
+
+    function tickSpacingToMaxLiquidityPerTick(int24 tickSpacing) internal pure returns (uint128 maxLiqPerTick) {
+        int24 minValidTick = (TickMath.MIN_VALID_TICK / tickSpacing) * tickSpacing;
+
+        int24 maxValidTick = (TickMath.MAX_VALID_TICK / tickSpacing) * tickSpacing;
+
+        // this answersHow many usable tick positions exist between `minTick` and `maxTick`, why the +1, becase say diff is 2 tick psotions, henc A..(1).B..(2)..C, 2 gaps but 3 ticks see
+        uint24 maxMinTickDiff = uint24((maxValidTick - minValidTick) / tickSpacing) + 1;
+
+        maxLiqPerTick = type(uint128).max / maxMinTickDiff; // gives per tick ho much liq it can hold, or in number wise...that huge number is distributed to those ticks
+    }
 }
