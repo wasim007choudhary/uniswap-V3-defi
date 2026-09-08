@@ -51,14 +51,30 @@ library TickBitMap {
         bitPos = uint8(uint24(tick % 256)); // sol 0.8+ dpesnt all direct conversion...int24..-> uint24..then only uint8..not directly int24->uint8..it breaks in modern soldity
     }
 
-    function flickTick(mapping(int16 => uint8) storage self, int24 tickSpacing, int24 tick)
-        internal
-        pure
-        returns (int24 flickedTick)
-    {
+    /**
+     * @notice Flips the initialized state for a given tick from false to true, or vice versa.
+     * @dev The tick must be exactly divisible by tickSpacing so that the compressed tick
+     *      represents a valid usable tick. The compressed tick is converted into a bitmap
+     *      word position and bit position, then a single-bit mask is created and XORed
+     *      against the corresponding bitmap word to toggle that bit.
+     *
+     *      The mask `1 << bitPos` is equivalent to `1 * (2 ** bitPos)`, which places
+     *      a single `1` at `bitPos`.
+     *
+     * @param mapRef The bitmap mapping in which the tick's initialized state is flipped.
+     * @param tickSpacing The spacing between usable ticks.
+     * @param tick The tick whose initialized state is to be flipped.
+     *
+     * @custom:dissection For complete line-by-line dissection and reverse-engineering, visit:
+     *      `notes/5.TickBitmap & NextTickAlgo/2.CodeBase/2.TickBitMap Library/2.flickTickFun.md`
+     */
+
+    function flickTick(mapping(int16 => uint256) storage mapRef, int24 tickSpacing, int24 tick) internal {
         require(tick % tickSpacing == 0);
         (int16 wordPos, uint8 bitPos) = position(tick / tickSpacing);
 
-        uint256 mask = 1 << bitPos;
+        uint256 mask = 1 << bitPos; //  same as 1 × 2^bitPos...or is written as: 1 * (2 ** bitPos), and if 1 >> bitpos, then 1/2^bitpos is: x / (2 ** n)..for negative floor(x / (2 ** n)) or else -1.7 becomes -1 omdead of -2 because of sol roudning down! Extra knwoledge for negative here tho but ignmore it ggs!
+
+        mapRef[wordPos] ^= mask;
     }
 }
