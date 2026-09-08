@@ -50,4 +50,15 @@ library TickBitMap {
         wordPos = int16(tick / 256); // or >> 8 same ...as 8bits = 256 in other wrds 0....255...total equals 256 positions
         bitPos = uint8(uint24(tick % 256)); // sol 0.8+ dpesnt all direct conversion...int24..-> uint24..then only uint8..not directly int24->uint8..it breaks in modern soldity
     }
+
+    function flickTick(mapping(int16 => uint8) storage self, int24 tickSpacing, int24 tick)
+        internal
+        pure
+        returns (int24 flickedTick)
+    {
+        require(tick % tickSpacing == 0);
+        (int16 wordPos, uint8 bitPos) = position(tick / tickSpacing);
+
+        uint256 mask = 1 << bitPos;
+    }
 }
