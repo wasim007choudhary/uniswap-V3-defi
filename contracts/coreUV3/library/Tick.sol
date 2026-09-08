@@ -78,14 +78,37 @@ library Tick {
     ///////////////////////////////////////////////////////////////////////////////////////////////////
     ///////////////////////////////////////////////////////////////////////////////////////////////////
 
+    /**
+     * @notice Calculates the maximum liquidity that can be stored at any individual tick
+     *         for a given tick spacing.
+     * @dev Determines the minimum and maximum valid ticks aligned to `tickSpacing`,
+     *      calculates the total number of usable tick positions (including both
+     *      endpoints), and divides the maximum `uint128` value by that count to
+     *      derive the per-tick liquidity limit.
+     * @param tickSpacing The spacing between usable/initializable ticks.
+     * @return maxLiqPerTick The maximum `liquidityGross` that can be stored at one tick.
+     *
+     * @custom:dissection Visit : `notes/CoreLibFunctions/Tick.sol/2.tickSpacingToMaxLiquidityPerTick_Fun.md` in the repo for compete reverse-engineering/dissection of this struct with examples etc
+     */
     function tickSpacingToMaxLiquidityPerTick(int24 tickSpacing) internal pure returns (uint128 maxLiqPerTick) {
         int24 minValidTick = (TickMath.MIN_VALID_TICK / tickSpacing) * tickSpacing;
 
         int24 maxValidTick = (TickMath.MAX_VALID_TICK / tickSpacing) * tickSpacing;
 
-        // this answersHow many usable tick positions exist between `minTick` and `maxTick`, why the +1, becase say diff is 2 tick psotions, henc A..(1).B..(2)..C, 2 gaps but 3 ticks see
+        // This answers: How many usable tick positions exist between `minValidTick`
+        // and `maxValidTick`?
+        //
+        // The `+1` is required because the division gives the number of gaps/intervals.
+        // For example:
+        //
+        // A ... (1) ... B ... (2) ... C
+        //
+        // There are 2 gaps, but 3 tick positions: A, B, and C.
         uint24 maxMinTickDiff = uint24((maxValidTick - minValidTick) / tickSpacing) + 1;
 
-        maxLiqPerTick = type(uint128).max / maxMinTickDiff; // gives per tick ho much liq it can hold, or in number wise...that huge number is distributed to those ticks
+        // Gives the maximum amount of liquidity that can be stored at one tick.
+        // Conceptually, the maximum uint128 value is divided across the number
+        // of usable tick positions to establish the per-tick liquidity limit.
+        maxLiqPerTick = type(uint128).max / maxMinTickDiff;
     }
 }
