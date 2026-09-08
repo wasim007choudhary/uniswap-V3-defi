@@ -83,9 +83,33 @@ library TickBitMap {
         int24 tick,
         int24 tickSpacing,
         bool lessThanOrEqualTo
-    ) internal returns (int24 nextTick, bool initialized) {
+    ) internal view returns (int24 nextTick, bool initialized) {
         int24 compressed = tick / tickSpacing;
 
         if (tick < 0 && tick % tickSpacing != 0) compressed--;
+
+        if (lessThanOrEqualTo) {
+            (int16 wordPos, uint8 bitPos) = position(compressed);
+
+            uint256 mask = 1 << bitPos - 1 + (1 << bitPos);
+            uint256 masked = mapRef[wordPos] & mask;
+            initialized = masked != 0;
+            if (initialized) {
+                nextTick = (compressed - int24(uint24(bitPos - (BitMath.mostSignificantBit(masked))))) * tickSpacing;
+            } else {
+                nextTick = (compressed - int24(uint24(bitPos))) * tickSpacing;
+            }
+        } else {
+            (int16 wordPos, uint8 bitPos) = position(compressed + 1);
+
+            uint256 mask = ~((1 << bitPos) - 1);
+            uint256 masked = mapRef[wordPos] & mask;
+            initialized = masked != 0;
+            if (initialized) {
+                nextTick = (compressed + 1 + int24(uint24(BitMath.leastSignificantBit(masked) - bitPos))) * tickSpacing;
+            } else {
+                nextTick = (compressed + 1 + int24(uint24(type(uint8).max - bitPos))) * tickSpacing;
+            }
+        }
     }
 }
