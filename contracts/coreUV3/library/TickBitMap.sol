@@ -77,4 +77,15 @@ library TickBitMap {
 
         mapRef[wordPos] ^= mask;
     }
+
+    function nextInitializedTickWithinOneWord(
+        mapping(int16 => uint256) storage mapRef,
+        int24 tick,
+        int24 tickSpacing,
+        bool lessThanOrEqualTo
+    ) internal returns (int24 nextTick, bool initialized) {
+        int24 compressed = tick / tickSpacing;
+
+        if (tick < 0 && tick % tickSpacing != 0) compressed--;
+    }
 }
