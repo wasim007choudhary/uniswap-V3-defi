@@ -114,6 +114,38 @@ library Tick {
     ///////////////////////////////////////////////////////////////////////////////////////////////////////
     ///////////////////////////////////////////////////////////////////////////////////////////////////////
 
+    /**
+     * @notice Calculates the cumulative fee growth inside an LP's tick range.
+     * @dev
+     *      A = tickLower, B = tickUpper, C = currentTick.
+     *
+     *      Below A always means the left side of A.
+     *      Above B always means the right side of B.
+     *
+     *      C only tells us how to interpret the stored feeGrowthOutside:
+     *      - If C >= A, use lower.feeGrowthOutside directly for below.
+     *      - If C < A, use feeGrowthGlobal - lower.feeGrowthOutside for below.
+     *      - If C < B, use upper.feeGrowthOutside directly for above.
+     *      - If C >= B, use feeGrowthGlobal - upper.feeGrowthOutside for above.
+     *
+     *      Finally:
+     *      feeGrowthInside = feeGrowthGlobal - feeGrowthBelow - feeGrowthAbove.
+     *
+     *      The calculation is done separately for Token0 and Token1.
+     *
+     *
+     * @param mapRef Mapping containing information for every initialized tick.
+     * @param tickLower Lower tick of the LP position.
+     * @param tickUpper Upper tick of the LP position.
+     * @param currentTick Current pool tick.
+     * @param feeGrowthGlobal0x128 Global cumulative fee growth for Token0 in X128 format.
+     * @param feeGrowthGlobal1x128 Global cumulative fee growth for Token1 in X128 format.
+     * @return feeGrowthInside0x128 Cumulative fee growth inside the range for Token0.
+     * @return feeGrowthInside1x128 Cumulative fee growth inside the range for Token1.
+     *
+     *
+     * @custom:dissection Visit : `notes/CoreLibFunctions/Tick.sol/3.getFeeGrowthInside.md` in the repo for compete reverse-engineering/dissection of this struct with examples etc.
+     */
     function getFeeGrowthInside(
         mapping(int24 => Tick.TickInfo) storage mapRef,
         int24 tickLower,
@@ -121,7 +153,7 @@ library Tick {
         int24 currentTick,
         uint256 feeGrowthGlobal0x128,
         uint256 feeGrowthGlobal1x128
-    ) internal view returns (uint256 feeGrowthInside0X128, uint256 feeGrowthInside1X128) {
+    ) internal view returns (uint256 feeGrowthInside0x128, uint256 feeGrowthInside1x128) {
         TickInfo storage lower = mapRef[tickLower];
         TickInfo storage upper = mapRef[tickUpper];
 
@@ -138,6 +170,140 @@ library Tick {
 
         uint256 feeGrowthAboveUpper0x128;
         uint256 feeGrowthAboveUpper1x128;
+
+        /**
+         * @dev Let A = lower, B = upper, C = current.
+         *
+         *      Below A = LEFT of A.
+         *      Above B = RIGHT of B.
+         *
+         *      C does not change what below or above mean.
+         *      C only tells us how to read feeGrowthOutside.
+         *
+         *      Below:
+         *      C >= A → OUTSIDE
+         *      C < A  → GLOBAL - OUTSIDE
+         *
+         *      Above:
+         *      C < B  → OUTSIDE
+         *      C >= B → GLOBAL - OUTSIDE
+         *
+         *      🔥 IMPORTANT:
+         *
+         *      When C is inside the range:
+         *
+         *              BELOW              INSIDE              ABOVE
+         *
+         *      ──────────A══════════════════C══════════════════B────────→
+         *                ↑                                      ↑
+         *              lower                                  upper
+         *
+         *      If we look at A:
+         *
+         *      <----till protocl line ends───────────────|A|
+         *          BELOW
+         *          OUTSIDE
+         *
+         *      So for A, below A is the outside side.
+         *
+         *      If we look at B:
+         *
+         *                                   |B|───────────────>till protocl line ends--->
+         *                                       ABOVE
+         *                                       OUTSIDE
+         *
+         *      So for B, above B is the outside side.
+         *
+         *      Therefore, when C is inside:
+         *
+         *      A → BELOW = OUTSIDE
+         *      B → ABOVE = OUTSIDE
+         *
+         *
+         *      🔥 Now when C is outside the range:
+         *
+         *      C          A                         B
+         *      ↓          ↓                         ↓
+         *      ●──────────●═════════════════════════●────────→
+         *
+         *      C is below the range.
+         *
+         *      For A, the outside side is considered from A towards the RIGHT:
+         *
+         *      C          A                         B
+         *      ↓          ↓                         ↓
+         *      ●──────────●═════════════════════════●────────→
+         *                 │
+         *                 └──────────────────────────────→
+         *                          OUTSIDE
+         *
+         *      This includes B and everything to the right until the line ends.
+         *
+         *      Therefore:
+         *
+         *      GLOBAL - OUTSIDE = BELOW A
+         *
+         *
+         *      🔥 If C is above the range:
+         *
+         *      A                         B          C
+         *      ↓                         ↓          ↓
+         *      ●═════════════════════════●──────────●────────→
+         *
+         *      C is above the range.
+         *
+         *      For B, the outside side is considered from B towards the LEFT:
+         *
+         *      A                         B          C
+         *      ↓                         ↓          ↓
+         *      ●═════════════════════════●──────────●────────→
+         *      │                         │
+         *      ←─────────────────────────┘
+         *                OUTSIDE
+         *
+         *      This includes A, the whole range, and everything below A.
+         *
+         *      Therefore:
+         *
+         *      GLOBAL - OUTSIDE = ABOVE B
+         *
+         *
+         *      ⚠️ But remember:
+         *
+         *      Below A and Above B do NOT change with C.
+         *
+         *      Below A always means:
+         *
+         *      <──────── A
+         *         BELOW
+         *
+         *      Above B always means:
+         *
+         *      B ─────────→
+         *          ABOVE
+         *
+         *      Below A = below the range.
+         *      Above B = above the range.
+         *
+         *      Their meaning has nothing to do with where C currently is.
+         *
+         *      What changes with C is only how the stored
+         *      feeGrowthOutside value is interpreted.
+         *
+         *
+         *      🧒 Simple way to remember:
+         *
+         *      Below / Above = fixed place.
+         *
+         *      Outside = stored checkpoint.
+         *
+         *      C = tells us which way to read that checkpoint.
+         *
+         *
+         *      Finally:
+         *
+         *      INSIDE = GLOBAL - BELOW - ABOVE
+         */
         if (currentTick < tickUpper) {
             feeGrowthAboveUpper0x128 = upper.feeGrowthOutside0X128;
             feeGrowthAboveUpper1x128 = upper.feeGrowthOutside1X128;
@@ -146,7 +312,7 @@ library Tick {
             feeGrowthAboveUpper1x128 = feeGrowthGlobal0x128 - upper.feeGrowthOutside1X128;
         }
 
-        uint256 feeGrowthInside0x128 = feeGrowthGlobal0x128 - feeGrowthBelowLowe0x128 - feeGrowthAboveUpper0x128;
-        uint256 feeGrowthInside1x128 = feeGrowthGlobal0x128 - feeGrowthBelowLower1x128 - feeGrowthAboveUpper1x128;
+        feeGrowthInside0x128 = feeGrowthGlobal0x128 - feeGrowthBelowLowe0x128 - feeGrowthAboveUpper0x128;
+        feeGrowthInside1x128 = feeGrowthGlobal0x128 - feeGrowthBelowLower1x128 - feeGrowthAboveUpper1x128;
     }
 }
