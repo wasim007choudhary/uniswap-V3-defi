@@ -77,7 +77,6 @@ library Tick {
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////
     ///////////////////////////////////////////////////////////////////////////////////////////////////
-
     /**
      * @notice Calculates the maximum liquidity that can be stored at any individual tick
      *         for a given tick spacing.
@@ -110,5 +109,44 @@ library Tick {
         // Conceptually, the maximum uint128 value is divided across the number
         // of usable tick positions to establish the per-tick liquidity limit.
         maxLiqPerTick = type(uint128).max / maxMinTickDiff;
+    }
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    function getFeeGrowthInside(
+        mapping(int24 => Tick.TickInfo) storage mapRef,
+        int24 tickLower,
+        int24 tickUpper,
+        int24 currentTick,
+        uint256 feeGrowthGlobal0x128,
+        uint256 feeGrowthGlobal1x128
+    ) internal view returns (uint256 feeGrowthInside0X128, uint256 feeGrowthInside1X128) {
+        TickInfo storage lower = mapRef[tickLower];
+        TickInfo storage upper = mapRef[tickUpper];
+
+        uint256 feeGrowthBelowLowe0x128;
+        uint256 feeGrowthBelowLower1x128;
+
+        if (currentTick >= tickLower) {
+            feeGrowthBelowLowe0x128 = lower.feeGrowthOutside0X128;
+            feeGrowthBelowLower1x128 = lower.feeGrowthOutside1X128;
+        } else {
+            feeGrowthBelowLowe0x128 = feeGrowthGlobal0x128 - lower.feeGrowthOutside0X128;
+            feeGrowthBelowLower1x128 = feeGrowthGlobal1x128 - lower.feeGrowthOutside1X128;
+        }
+
+        uint256 feeGrowthAboveUpper0x128;
+        uint256 feeGrowthAboveUpper1x128;
+        if (currentTick < tickUpper) {
+            feeGrowthAboveUpper0x128 = upper.feeGrowthOutside0X128;
+            feeGrowthAboveUpper1x128 = upper.feeGrowthOutside1X128;
+        } else {
+            feeGrowthAboveUpper0x128 = feeGrowthGlobal0x128 - upper.feeGrowthOutside0X128;
+            feeGrowthAboveUpper1x128 = feeGrowthGlobal0x128 - upper.feeGrowthOutside1X128;
+        }
+
+        uint256 feeGrowthInside0x128 = feeGrowthGlobal0x128 - feeGrowthBelowLowe0x128 - feeGrowthAboveUpper0x128;
+        uint256 feeGrowthInside1x128 = feeGrowthGlobal0x128 - feeGrowthBelowLower1x128 - feeGrowthAboveUpper1x128;
     }
 }
