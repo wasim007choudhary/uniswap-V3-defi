@@ -326,20 +326,33 @@ library Tick {
         uint256 feeGrowthGlobal0x128,
         uint256 feeGrowthGlobal1x128,
         uint160 secondsPerLiquidityCumulativeX128,
-        uint256 tickCumulative,
+        int56 tickCumulative,
         uint32 time,
         bool upperBoundry,
         uint128 maxLiquidityAllowedPerTick
     ) internal returns (bool flipped) {
         TickInfo storage tickInfo = mapRef[tick];
 
-        uint128 liquidityBeforeDelta = tickInfo.liquidityGross;
-        uint128 liquidityAfterDelta = MyCustomLiquidityMath.deltaAddition(liquidityBeforeDelta, liquidityDelta);
+        uint128 liquidityGrossBeforeDelta = tickInfo.liquidityGross;
+        uint128 liquidityGrossAfterDelta =
+            MyCustomLiquidityMath.deltaAddition(liquidityGrossBeforeDelta, liquidityDelta);
 
-        if (liquidityAfterDelta > maxLiquidityAllowedPerTick) {
+        if (liquidityGrossAfterDelta > maxLiquidityAllowedPerTick) {
             revert Tick__updateTick__LiquidityLimitCrossedForASingleTick();
         }
 
-        flipped = (liquidityAfterDelta == 0) != (liquidityBeforeDelta == 0);
+        flipped = (liquidityGrossAfterDelta == 0) != (liquidityGrossBeforeDelta == 0);
+
+        if (liquidityGrossBeforeDelta == 0) {
+            if (currentTick >= tick) {
+                tickInfo.feeGrowthOutside0X128 = feeGrowthGlobal0x128;
+                tickInfo.feeGrowthOutside1X128 = feeGrowthGlobal1x128;
+                tickInfo.secondsPerLiquidtyOutsideX128 = secondsPerLiquidityCumulativeX128;
+                tickInfo.tickCumulativeOutside = tickCumulative;
+                tickInfo.secondOutside = time;
+            }
+            tickInfo.initialized = true;
+        }
+        tickInfo.liquidityGross = liquidityGrossAfterDelta;
     }
 }
