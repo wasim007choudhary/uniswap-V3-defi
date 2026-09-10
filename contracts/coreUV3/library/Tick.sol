@@ -420,8 +420,19 @@ library Tick {
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////
     ///////////////////////////////////////////////////////////////////////////////////////////////////////
-
+    /**
+     * @notice Clears all stored data for a specific tick.
+     * @dev Resets the TickInfo at the given tick to its default values.
+     * @param mapRef The mapping that stores information for each tick.
+     * @param tick The specific tick whose data will be cleared.
+     *
+     * @custom:dissection Visit : `notes/CoreLibFunctions/Tick.sol/5.clearFun.md` in the repo for compete reverse-engineering/dissection of this struct with examples etc.
+     *
+     */
     function clearTickData(mapping(int24 => Tick.TickInfo) storage mapRef, int24 tick) internal {
         delete mapRef[tick];
     }
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////
 }
