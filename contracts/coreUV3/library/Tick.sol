@@ -318,6 +318,46 @@ library Tick {
         feeGrowthInside1x128 = feeGrowthGlobal0x128 - feeGrowthBelowLower1x128 - feeGrowthAboveUpper1x128;
     }
 
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////
+    /**
+     * @notice Updates the information of one specific tick.
+     *
+     * @dev
+     * This function:
+     *
+     * 1. Gets the tick's storage record.
+     * 2. Calculates the new liquidityGross after adding/removing liquidity.
+     * 3. Checks that the tick does not exceed its maximum allowed liquidity.
+     * 4. Checks whether the tick changed between zero and non-zero liquidity.
+     * 5. If the tick was not initialized before, initializes its accounting data.
+     * 6. Stores the new liquidityGross.
+     * 7. Updates liquidityNet:
+     *    - lower tick  → adds liquidityDelta
+     *    - upper tick  → subtracts liquidityDelta
+     *
+     * @param mapRef The mapping that stores the information of every tick.
+     * @param tick The specific tick whose information will be updated.
+     * @param currentTick The pool's current tick. Used to know where the current price is relative to this tick.
+     * @param liquidityDelta The amount of liquidity being added or removed.
+     *                     Positive means adding liquidity.
+     *                     Negative means removing liquidity.
+     * @param feeGrowthGlobal0x128 The pool's current global fee growth for token0.
+     * @param feeGrowthGlobal1x128 The pool's current global fee growth for token1.
+     * @param secondsPerLiquidityCumulativeX128 The pool's current cumulative seconds per unit of liquidity.
+     * @param tickCumulative The pool's current cumulative tick value used for time-based accounting.
+     * @param time The current block timestamp.
+     * @param upperBoundry Tells whether this tick is the upper boundary of the position.
+     *                     true  = upper tick
+     *                     false = lower tick
+     * @param maxLiquidityAllowedPerTick The maximum liquidityGross allowed at this tick.
+     *
+     * @return flipped True if the tick changed between zero and non-zero liquidityGross.
+     *                 False if its zero/non-zero state stayed the same.
+     *
+     *
+     * @custom:dissection Visit : `notes/CoreLibFunctions/Tick.sol/4.updateFun.md` in the repo for compete reverse-engineering/dissection of this struct with examples etc.
+     */
     function updateTick(
         mapping(int24 => Tick.TickInfo) storage mapRef,
         int24 tick,
