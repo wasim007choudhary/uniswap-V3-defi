@@ -332,5 +332,6 @@ library Tick {
         TickInfo storage tickInfo = mapRef[tick];
 
         uint128 liquidityBeforeDelta = tickInfo.liquidityGross;
+        uint128 liquidityAfterDelta = MyCustomLiquidityMath.deltaAddition(liquidityBeforeDelta, liquidityDelta);
     }
 }
