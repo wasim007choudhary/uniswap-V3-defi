@@ -339,5 +339,7 @@ library Tick {
         if (liquidityAfterDelta > maxLiquidityAllowedPerTick) {
             revert Tick__updateTick__LiquidityLimitCrossedForASingleTick();
         }
+
+        flipped = (liquidityAfterDelta == 0) != (liquidityBeforeDelta == 0);
     }
 }
