@@ -330,5 +330,7 @@ library Tick {
         uint128 maxLiquidity
     ) internal returns (bool flipped) {
         TickInfo storage tickInfo = mapRef[tick];
+
+        uint128 liquidityBeforeDelta = tickInfo.liquidityGross;
     }
 }
