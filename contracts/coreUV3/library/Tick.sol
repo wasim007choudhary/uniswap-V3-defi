@@ -354,5 +354,11 @@ library Tick {
             tickInfo.initialized = true;
         }
         tickInfo.liquidityGross = liquidityGrossAfterDelta;
+
+        if (upperBoundry) {
+            tickInfo.liquidityNet -= liquidityDelta;
+        } else {
+            tickInfo.liquidityNet += liquidityDelta;
+        }
     }
 }
