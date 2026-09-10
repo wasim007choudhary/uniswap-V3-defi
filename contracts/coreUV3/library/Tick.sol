@@ -6,6 +6,12 @@ import {MyCustomSafeCast} from "contracts/coreUV3/library/MyCustomSafeCast.sol";
 import {TickMath} from "contracts/coreUV3/library/TickMath.sol";
 import {MyCustomLiquidityMath} from "contracts/coreUV3/library/MyCustomLiquidityMath.sol";
 
+/**
+ * @title Tick
+ * @notice Contains functions for managing tick data and calculations.
+ *
+ * @custom:dissection Visit: `notes/CoreLibFunctions/Tick.sol` for dissection and reverse-Engineering  for the functions with notes to extreme deatils and simplicity with child analogies and exapmles
+ */
 library Tick {
     error Tick__updateTick__LiquidityLimitCrossedForASingleTick();
 
@@ -436,64 +442,40 @@ library Tick {
     ///////////////////////////////////////////////////////////////////////////////////////////////////////
     ///////////////////////////////////////////////////////////////////////////////////////////////////////
     /**
-     * @notice Updates a tick when the price crosses it.
-     * @dev
-     * Imagine every tick is a door 🚪 and the price is a child walking along a hallway.
-     *
-     * When the price walks through this tick, the meaning of "outside"
-     * changes to the other side of the tick.
-     *
-     * So this function flips the stored "outside" information by doing:
-     *
-     *     new outside = global value - old outside value
-     *
-     * It does this for:
-     * - token0 fee growth
-     * - token1 fee growth
-     * - seconds per liquidity
-     * - cumulative tick
-     * - seconds
-     *
-     * At the end, it gives back the liquidityNet already stored at this tick.
-     *
-     * @param mapRef The mapping that stores information about every tick.
-     * @param tick The tick that the price has just crossed.
-     * @param feeGrowthGlobal0x128 The total fee growth for token0 in the whole pool.
-     * @param feeGrowthGlobal1x128 The total fee growth for token1 in the whole pool.
-     * @param secondsPerLiquidityCumulativeX128 The total accumulated seconds per unit of liquidity.
-     * @param tickCumulative The total accumulated tick value over time.
-     * @param time The current time, usually the current block timestamp.
-     *
-     * @return liquidityNet The signed liquidity change stored at the crossed tick.
-     *         The caller uses this value to update the pool's active liquidity.
-     *
-     *
+     * @notice Updates the stored accounting data when the price crosses an initialized tick.
      *
      * @dev
-     * Think of a tick as a door 🚪.
+     * When price crosses a tick, the side considered "outside" of that tick flips.
      *
-     * The price walks toward the door.
-     * When the price passes through the door, the "outside" side changes.
+     * For each cumulative accounting value, the new outside value is calculated as:
      *
-     * Before crossing:
+     *      NEW OUTSIDE = GLOBAL/CURRENT VALUE - OLD OUTSIDE
      *
-     *     OLD OUTSIDE | TICK | OTHER SIDE
+     * This flips the stored outside checkpoint to represent the opposite side
+     * without needing to calculate the whole history again.
      *
-     * After crossing:
+     * This function does NOT calculate liquidityNet.
+     * liquidityNet was already established and stored in the tick when the
+     * position's lower/upper boundary was updated.
      *
-     *     OTHER SIDE  | TICK | OLD OUTSIDE
+     * This function only reads that stored liquidityNet and returns it.
+     * The caller can then use the returned liquidityNet to update the pool's
+     * active liquidity according to the direction of price movement.
      *
-     * We therefore calculate the new outside value as:
+     * @param mapRef The mapping containing the stored information for each tick.
+     * @param tick The initialized tick that the price has just crossed.
+     * @param feeGrowthGlobal0x128 The current global cumulative fee growth for token0.
+     * @param feeGrowthGlobal1x128 The current global cumulative fee growth for token1.
+     * @param secondsPerLiquidityCumulativeX128 The current cumulative seconds per unit of liquidity.
+     * @param tickCumulative The current cumulative tick value used for time-based accounting.
+     * @param time The current block timestamp.
      *
-     *     NEW OUTSIDE = GLOBAL - OLD OUTSIDE
-     *
-     * Finally, we return the liquidityNet written on this tick.
+     * @return liquidityNet The signed liquidity effect already stored at the crossed tick.
      *
      *
      *
      * @custom:dissection Visit : `notes/CoreLibFunctions/Tick.sol/6.crossFun.md` in the repo for compete reverse-engineering/dissection of this struct with examples etc.
      */
-
     function crossingTick(
         mapping(int24 => Tick.TickInfo) storage mapRef,
         int24 tick,
