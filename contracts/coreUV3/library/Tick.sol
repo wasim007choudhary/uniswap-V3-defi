@@ -154,8 +154,8 @@ library Tick {
         uint256 feeGrowthGlobal0x128,
         uint256 feeGrowthGlobal1x128
     ) internal view returns (uint256 feeGrowthInside0x128, uint256 feeGrowthInside1x128) {
-        TickInfo storage lower = mapRef[tickLower];
-        TickInfo storage upper = mapRef[tickUpper];
+        Tick.TickInfo storage lower = mapRef[tickLower];
+        Tick.TickInfo storage upper = mapRef[tickUpper];
 
         uint256 feeGrowthBelowLowe0x128;
         uint256 feeGrowthBelowLower1x128;
@@ -314,5 +314,21 @@ library Tick {
 
         feeGrowthInside0x128 = feeGrowthGlobal0x128 - feeGrowthBelowLowe0x128 - feeGrowthAboveUpper0x128;
         feeGrowthInside1x128 = feeGrowthGlobal0x128 - feeGrowthBelowLower1x128 - feeGrowthAboveUpper1x128;
+    }
+
+    function updateTick(
+        mapping(int24 => Tick.TickInfo) storage mapRef,
+        int24 tick,
+        int24 currentTick,
+        int128 liquidityDelta,
+        uint256 feeGrowthGlobal0x128,
+        uint256 feeGrowthGlobal1x128,
+        uint160 secondsPerLiquidityCumulativeX128,
+        uint256 tickCumulative,
+        uint32 time,
+        bool upperBoundry,
+        uint128 maxLiquidity
+    ) internal returns (bool flipped) {
+        TickInfo storage tickInfo = mapRef[tick];
     }
 }
