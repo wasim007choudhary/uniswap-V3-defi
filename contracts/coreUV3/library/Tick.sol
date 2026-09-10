@@ -7,6 +7,8 @@ import {TickMath} from "contracts/coreUV3/library/TickMath.sol";
 import {MyCustomLiquidityMath} from "contracts/coreUV3/library/MyCustomLiquidityMath.sol";
 
 library Tick {
+    error Tick__updateTick__LiquidityLimitCrossedForASingleTick();
+
     using MyCustomSafeCast for int256;
 
     /**
@@ -327,11 +329,15 @@ library Tick {
         uint256 tickCumulative,
         uint32 time,
         bool upperBoundry,
-        uint128 maxLiquidity
+        uint128 maxLiquidityAllowedPerTick
     ) internal returns (bool flipped) {
         TickInfo storage tickInfo = mapRef[tick];
 
         uint128 liquidityBeforeDelta = tickInfo.liquidityGross;
         uint128 liquidityAfterDelta = MyCustomLiquidityMath.deltaAddition(liquidityBeforeDelta, liquidityDelta);
+
+        if (liquidityAfterDelta > maxLiquidityAllowedPerTick) {
+            revert Tick__updateTick__LiquidityLimitCrossedForASingleTick();
+        }
     }
 }
