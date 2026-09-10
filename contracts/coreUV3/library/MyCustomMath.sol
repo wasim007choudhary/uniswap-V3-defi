@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 ///@notice This library is a sol 0.8.0+ implementation of the original/old sol version Uniswap V3 Math.sol library.
 ///@dev The original Uniswap V3 Math.sol library was written in an older version of Solidity that did not have built-in overflow checks. In Solidity 0.8.0 and later, overflow checks are built into the language, making the original Math.sol library unnecessary.
 ///@notice We Hvae removed the checls which are not needed and did our own to read about the original library and the changes we made to it,
-///@dev please read notes/CoreLibFunctions/Math.md to get the full dissecton of the original lib and why we wrote our own.
+///@dev please read notes/CoreLibFunctions/LowGasSafeMath.md to get the full dissecton of the original lib and why we wrote our own.
 
 ///@notice You are wondering why same function names and wont it cause issue but here is the answer - Solidity allows function overloading, so having the same function name is fine as long as the parameter types/signatures are different.
 

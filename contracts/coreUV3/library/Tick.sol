@@ -435,4 +435,86 @@ library Tick {
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////
     ///////////////////////////////////////////////////////////////////////////////////////////////////////
+    /**
+     * @notice Updates a tick when the price crosses it.
+     * @dev
+     * Imagine every tick is a door 🚪 and the price is a child walking along a hallway.
+     *
+     * When the price walks through this tick, the meaning of "outside"
+     * changes to the other side of the tick.
+     *
+     * So this function flips the stored "outside" information by doing:
+     *
+     *     new outside = global value - old outside value
+     *
+     * It does this for:
+     * - token0 fee growth
+     * - token1 fee growth
+     * - seconds per liquidity
+     * - cumulative tick
+     * - seconds
+     *
+     * At the end, it gives back the liquidityNet already stored at this tick.
+     *
+     * @param mapRef The mapping that stores information about every tick.
+     * @param tick The tick that the price has just crossed.
+     * @param feeGrowthGlobal0x128 The total fee growth for token0 in the whole pool.
+     * @param feeGrowthGlobal1x128 The total fee growth for token1 in the whole pool.
+     * @param secondsPerLiquidityCumulativeX128 The total accumulated seconds per unit of liquidity.
+     * @param tickCumulative The total accumulated tick value over time.
+     * @param time The current time, usually the current block timestamp.
+     *
+     * @return liquidityNet The signed liquidity change stored at the crossed tick.
+     *         The caller uses this value to update the pool's active liquidity.
+     *
+     *
+     *
+     * @dev
+     * Think of a tick as a door 🚪.
+     *
+     * The price walks toward the door.
+     * When the price passes through the door, the "outside" side changes.
+     *
+     * Before crossing:
+     *
+     *     OLD OUTSIDE | TICK | OTHER SIDE
+     *
+     * After crossing:
+     *
+     *     OTHER SIDE  | TICK | OLD OUTSIDE
+     *
+     * We therefore calculate the new outside value as:
+     *
+     *     NEW OUTSIDE = GLOBAL - OLD OUTSIDE
+     *
+     * Finally, we return the liquidityNet written on this tick.
+     *
+     *
+     *
+     * @custom:dissection Visit : `notes/CoreLibFunctions/Tick.sol/6.crossFun.md` in the repo for compete reverse-engineering/dissection of this struct with examples etc.
+     */
+
+    function crossingTick(
+        mapping(int24 => Tick.TickInfo) storage mapRef,
+        int24 tick,
+        uint256 feeGrowthGlobal0x128,
+        uint256 feeGrowthGlobal1x128,
+        uint160 secondsPerLiquidityCumulativeX128,
+        int56 tickCumulative,
+        uint32 time
+    ) internal returns (int128 liquidityNet) {
+        Tick.TickInfo storage tickInfo = mapRef[tick];
+
+        tickInfo.feeGrowthOutside0X128 = feeGrowthGlobal0x128 - tickInfo.feeGrowthOutside0X128;
+        tickInfo.feeGrowthOutside1X128 = feeGrowthGlobal1x128 - tickInfo.feeGrowthOutside1X128;
+
+        tickInfo.secondsPerLiquidtyOutsideX128 =
+            secondsPerLiquidityCumulativeX128 - tickInfo.secondsPerLiquidtyOutsideX128;
+
+        tickInfo.tickCumulativeOutside = tickCumulative - tickInfo.tickCumulativeOutside;
+
+        tickInfo.secondOutside = time - tickInfo.secondOutside;
+
+        liquidityNet = tickInfo.liquidityNet;
+    }
 }
