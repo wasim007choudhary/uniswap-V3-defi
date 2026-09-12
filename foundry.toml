@@ -1,6 +1,10 @@
 [profile.default]
-src = "contracts"
+src = "contracts/ForTesting"
 out = "out"
 libs = ["lib"]
+solc_version = "0.8.20"
+
+[fuzz]
+runs = 270
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
