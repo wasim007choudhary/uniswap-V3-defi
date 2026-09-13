@@ -6,7 +6,8 @@ import {Test, console2} from "forge-std/Test.sol";
 /*import {MyCustomFullMath} from "contracts/coreUV3/library/MyCustomFullMATH.sol";
 import {UNISWAP_V3_POOL_USDC_WETH_500} from "Constants.sol";
 import {IUV3Pool} from "contracts/coreUV3/Interfaces/IUV3Pool.sol";*/
-import {TickMathCaller} from "contracts/ForTesting/CallingTicKmATH.sol";
+import {TMCaller} from "contracts/ForTesting/CallingTicKmATH.sol";
+import {TickMath} from "contracts/ForTesting/check.sol";
 
 /**
  * @title SpotPriceTest
@@ -154,23 +155,33 @@ contract TickMathOptimizationTest is Test {
 
               return sqrtPriceX96;
           }*/
-    TickMathCaller caller;
+
+    //  function setUp() public {
+    //    caller = new TickMathCaller();
+    //}
+    TMCaller caller;
 
     function setUp() public {
-        caller = new TickMathCaller();
-    }
-
-    function testGasOriginal() public {
-        caller.original(1);
+        caller = new TMCaller();
     }
 
     function testGasOptimized() public {
-        caller.optimized(1);
+        caller.callOptimized(-887);
     }
 
-    function testGasHybrid() public {
-        caller.hybrid(1);
+    function testGasOriginal() public {
+        caller.callOriginal(-887);
     }
+
+    /* function testGasOriginal() public {
+         vm.expectRevert(bytes("T"));
+         caller.original(887273);
+     }
+
+     function testGasOptimized() public {
+         vm.expectRevert(TickMath.TickMath___getSqrtPriceRatioAtTick__TickOutOfMaxBoundSetByTheProtocol.selector);
+         caller.optimized(887273);
+     }*/
 
     /* function testFuzGasCom(int24 tick) public pure {
          //  tick = int24(bound(int256(tick), -887272, 887272));
