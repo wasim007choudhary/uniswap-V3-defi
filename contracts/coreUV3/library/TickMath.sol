@@ -602,4 +602,6 @@ library TickMath {
          */
         sqrtPriceX96OfTheTick = uint160((ratio >> 32) + (ratio % (1 << 32) == 0 ? 0 : 1));
     }
+
+    function getTickAtSqrtPriceRatio(uint160 sqrtPriceRatio) internal pure returns (int24 tick) {}
 }
