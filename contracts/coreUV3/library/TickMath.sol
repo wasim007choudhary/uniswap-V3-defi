@@ -21,6 +21,7 @@ library TickMath {
      * Anything outside this range cannot be converted by this function.
      */
     error TickMath___getSqrtPriceRatioAtTick__TickOutOfMaxBoundSetByTheProtocol();
+    error TickMath___getTickAtSqrtPriceRatio__SqrtRootPriceRatioOutOfBounds();
 
     /**
      * @notice The smallest tick supported by this TickMath implementation.
@@ -603,5 +604,15 @@ library TickMath {
         sqrtPriceX96OfTheTick = uint160((ratio >> 32) + (ratio % (1 << 32) == 0 ? 0 : 1));
     }
 
-    function getTickAtSqrtPriceRatio(uint160 sqrtPriceRatio) internal pure returns (int24 tick) {}
+    function getTickAtSqrtPriceRatio(uint160 sqrtPriceRatio) internal pure returns (int24 tick) {
+        if (sqrtPriceRatio < MIN_SQRT_RATIO || sqrtPriceRatio >= MAX_SQRT_RATIO) {
+            revert TickMath___getTickAtSqrtPriceRatio__SqrtRootPriceRatioOutOfBounds();
+        }
+
+        uint256 ratio = uint256(sqrtPriceRatio) << 32;
+
+        uint256 r = ratio;
+
+        uint256 mostSignificantBit = 0; //ex 13 , log2(13) = 3....0 1 2 3...that psotion poer is the higest for 13, hecne 13 >= 2^n. < 14, read the docs you will get the
+    }
 }
