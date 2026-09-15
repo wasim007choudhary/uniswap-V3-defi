@@ -679,5 +679,9 @@ library TickMath {
 
         if (mostSignificantBit >= 128) r = ratio >> (mostSignificantBit - 127);
         else r = ratio << (127 - mostSignificantBit);
+
+        int256 log_2 = (int256(mostSignificantBit) - 128) << 64;
+
+        assembly {}
     }
 }
