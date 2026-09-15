@@ -676,5 +676,8 @@ library TickMath {
 
             mostSignificantBit := or(mostSignificantBit, f)
         }
+
+        if (mostSignificantBit >= 128) r = ratio >> (mostSignificantBit - 127);
+        else r = ratio << (127 - mostSignificantBit);
     }
 }
