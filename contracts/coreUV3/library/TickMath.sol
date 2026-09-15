@@ -614,5 +614,67 @@ library TickMath {
         uint256 r = ratio;
 
         uint256 mostSignificantBit = 0; //ex 13 , log2(13) = 3....0 1 2 3...that psotion poer is the higest for 13, hecne 13 >= 2^n. < 14, read the docs you will get the
+
+        assembly {
+            let f := shl(7, gt(r, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF))
+
+            mostSignificantBit := or(mostSignificantBit, f)
+
+            r := shr(f, r)
+        }
+
+        assembly {
+            let f := shl(6, gt(r, 0xFFFFFFFFFFFFFFFF))
+
+            mostSignificantBit := or(mostSignificantBit, f)
+
+            r := shr(f, r)
+        }
+
+        assembly {
+            let f := shl(5, gt(r, 0xFFFFFFFF))
+
+            mostSignificantBit := or(mostSignificantBit, f)
+
+            r := shr(f, r)
+        }
+
+        assembly {
+            let f := shl(4, gt(r, 0xFFFF))
+
+            mostSignificantBit := or(mostSignificantBit, f)
+
+            r := shr(f, r)
+        }
+
+        assembly {
+            let f := shl(3, gt(r, 0xFF))
+
+            mostSignificantBit := or(mostSignificantBit, f)
+
+            r := shr(f, r)
+        }
+
+        assembly {
+            let f := shl(2, gt(r, 0xF))
+
+            mostSignificantBit := or(mostSignificantBit, f)
+
+            r := shr(f, r)
+        }
+
+        assembly {
+            let f := shl(1, gt(r, 0x3))
+
+            mostSignificantBit := or(mostSignificantBit, f)
+
+            r := shr(f, r)
+        }
+
+        assembly {
+            let f := gt(r, 0x1)
+
+            mostSignificantBit := or(mostSignificantBit, f)
+        }
     }
 }
