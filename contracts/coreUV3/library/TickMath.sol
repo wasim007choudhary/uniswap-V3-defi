@@ -677,11 +677,30 @@ library TickMath {
             mostSignificantBit := or(mostSignificantBit, f)
         }
 
+        // the normalization part
         if (mostSignificantBit >= 128) r = ratio >> (mostSignificantBit - 127);
         else r = ratio << (127 - mostSignificantBit);
 
         int256 log_2 = (int256(mostSignificantBit) - 128) << 64;
 
-        assembly {}
+        /*
+
+                 1.Before movcing on, remebr this distinction, ratio = ratio * 2^128, it is in 128.128 format ok
+                 2. r is now after the normalization is r 2^127, as the higest bit now sits in that postion. Note that r = ratio then moved the hiest 1 to the 127 psotion, so hecne 128 psotion has no 1 rember that.
+
+                 3 Next is log_2 here we acquired the interger part can be zero or non etc. adn we fixed it o npostion 64. Inshort below psotion 64 are all fractional bits, from 63-0
+                 and 255 to 64 can be intergers ok!.  Note a importning thing ok - If the highest `1` of `ratio` is at position 130,(remebr we moved the higest bit of 1 of r to 127 not ratio) then:
+
+
+         2^130 <= ratio < 2^131 , here like ratio can be say 2^130 + something as tehre can be other ones below 2^230 which is more wehn standlone 230 is used you feel me but still less then 2^231   \]
+
+         Therefore:
+
+        130 <= log2(ratio) < 131 ..say msg = 130 we then know that log2(ratio) = 130 .xyzdandjsomething, and we fixe the before . thing from 64th to 255, and after decimal fractiona parts which we will get in the next beloow blocks one by kne
+                 */
+
+        assembly {
+            mul(r, r)
+        }
     }
 }
