@@ -700,7 +700,15 @@ library TickMath {
                  */
 
         assembly {
-            mul(r, r)
+            let r := shr(127, mul(r, r))
+            let f := shr(128, r)
+
+            log_2 := or(log_2, shl(63, f))
+
+            r := shr(f, r)
+
+
+
         }
     }
 }
