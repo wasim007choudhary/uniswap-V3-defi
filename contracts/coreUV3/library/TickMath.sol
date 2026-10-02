@@ -819,5 +819,9 @@ library TickMath {
 
         int24 lowerThanTrueTick = int24((log_sqrt10001 - 3402992956809132418596140100660247210) >> 128);
         int24 higherThanTrueTick = int24((log_sqrt10001 + 291339464771989622907027621153398088495) >> 128);
+
+        int24 tick = lowerThanTrueTick == higherThanTrueTick
+            ? lowerThanTrueTick
+            : getSqrtPriceRatioAtTick(higherThanTrueTick) <= sqrtPriceRatio ? higherThanTrueTick : lowerThanTrueTick;
     }
 }
