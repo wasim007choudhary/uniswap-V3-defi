@@ -817,6 +817,7 @@ library TickMath {
 
         int256 log_sqrt10001 = log_2 * 255738958999603826347141; // before it was of 2 now we conver it to our 1.0001 system, sweet!
 
-        int24 tickLow = int24((log_sqrt10001 - 3402992956809132418596140100660247210) >> 128);
+        int24 lowerThanTrueTick = int24((log_sqrt10001 - 3402992956809132418596140100660247210) >> 128);
+        int24 higherThanTrueTick = int24((log_sqrt10001 + 291339464771989622907027621153398088495) >> 128);
     }
 }
