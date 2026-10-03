@@ -604,17 +604,179 @@ library TickMath {
         sqrtPriceX96OfTheTick = uint160((ratio >> 32) + (ratio % (1 << 32) == 0 ? 0 : 1));
     }
 
+    /**
+     * @dev
+     * Find the tick that belongs to a given square-root price.
+     *
+     * We are doing the reverse of `getSqrtPriceRatioAtTick()`.
+     *
+     * That function does:
+     *
+     *     tick -> square-root price
+     *
+     * This function does:
+     *
+     *     square-root price -> tick
+     *
+     * The big idea is:
+     *
+     *     sqrtPriceRatio
+     *          ↓
+     *       make ratio
+     *          ↓
+     *     find biggest bit
+     *          ↓
+     *       normalize
+     *          ↓
+     *       find log2
+     *          ↓
+     *   convert log to tick system
+     *          ↓
+     *    get two tick guesses
+     *          ↓
+     *      check the guess
+     *          ↓
+     *       final tick
+     *
+     *
+     * @custom:dissection For complete line-by-line dissection and reverse-engineering of the function, visit:
+     *      `notes/CoreLibFunctions/TickMath/4.getTickAtSqrtPriceRatio_Fun.md`
+     */
+
     function getTickAtSqrtPriceRatio(uint160 sqrtPriceRatio) internal pure returns (int24 tick) {
+        /**
+         * @dev
+         * Make sure the square-root price is inside the allowed range.
+         *
+         * The function only works when:
+         *
+         *     sqrtPriceRatio >= MIN_SQRT_RATIO
+         *     sqrtPriceRatio <  MAX_SQRT_RATIO
+         *
+         * If the price is too small or too large, we stop immediately.
+         */
         if (sqrtPriceRatio < MIN_SQRT_RATIO || sqrtPriceRatio >= MAX_SQRT_RATIO) {
             revert TickMath___getTickAtSqrtPriceRatio__SqrtRootPriceRatioOutOfBounds();
         }
 
+        /**
+         * @dev
+         * Convert the Q64.96 square-root price into a Q128.128 value.
+         *
+         * The input is stored like this:
+         *
+         *     sqrtPriceRatio = sqrt(P) * 2^96
+         *
+         * We shift left by 32 bits:
+         *
+         *     sqrtPriceRatio << 32
+         *
+         * which means:
+         *
+         *     sqrt(P) * 2^96 * 2^32
+         *
+         *     = sqrt(P) * 2^128
+         *
+         * So we change:
+         *
+         *     Q64.96 -> Q128.128
+         *
+         * Why?
+         *
+         * Because the logarithm calculation that comes next needs this
+         * larger scaling.
+         */
         uint256 ratio = uint256(sqrtPriceRatio) << 32;
 
+        /**
+         * @dev
+         * Make a working copy of `ratio`.
+         *
+         * We are going to change `r` many times while searching for the
+         * most significant bit and calculating the logarithm.
+         *
+         * We keep `ratio` unchanged because we need the original value
+         * later when we normalize the number.
+         */
         uint256 r = ratio;
 
-        uint256 mostSignificantBit = 0; //ex 13 , log2(13) = 3....0 1 2 3...that psotion poer is the higest for 13, hecne 13 >= 2^n. < 14, read the docs you will get the
+        /**
+         * @dev
+         * Store the position of the most significant bit.
+         *
+         * The most significant bit means:
+         *
+         *     "Where is the highest 1-bit?"
+         *
+         * Example:
+         *
+         *     13 = 1101
+         *
+         * The bits are:
+         *
+         *     bit 3   bit 2   bit 1   bit 0
+         *       1       1       0       1
+         *
+         * So the highest set bit is bit 3.
+         *
+         * We can also say:
+         *
+         *     2^3 <= 13 < 2^4
+         *
+         *     8 <= 13 < 16
+         *
+         * Therefore:
+         *
+         *     mostSignificantBit = 3
+         *
+         * We start from zero because we have not found the bit yet.
+         */
+        uint256 mostSignificantBit = 0;
 
+        /**
+         * @dev
+         * Check whether `r` is bigger than 2^128.
+         *
+         * The hexadecimal value:
+         *
+         *     0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
+         *
+         * is:
+         *
+         *     2^128 - 1
+         *
+         * So:
+         *
+         *     r > 2^128 - 1
+         *
+         * means:
+         *
+         *     r >= 2^128
+         *
+         * This tells us that the highest 1-bit is at least bit 128.
+         *
+         * `gt()` returns only:
+         *
+         *     1 -> true
+         *     0 -> false
+         *
+         * Then:
+         *
+         *     shl(7, 1) = 128
+         *     shl(7, 0) = 0
+         *
+         * So `f` becomes either:
+         *
+         *     128
+         *
+         * or:
+         *
+         *     0
+         *
+         * If it is 128, we shift `r` right by 128 bits.
+         *
+         * This lets the next checks work on a smaller range.
+         */
         assembly {
             let f := shl(7, gt(r, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF))
 
@@ -623,6 +785,23 @@ library TickMath {
             r := shr(f, r)
         }
 
+        /**
+         * @dev
+         * Now check whether the remaining value is bigger than 2^64 - 1.
+         *
+         *     0xFFFFFFFFFFFFFFFF = 2^64 - 1
+         *
+         * If true:
+         *
+         *     f = 64
+         *
+         * If false:
+         *
+         *     f = 0
+         *
+         * So we are now checking whether the most significant bit is
+         * at least 64 positions higher than the current range.
+         */
         assembly {
             let f := shl(6, gt(r, 0xFFFFFFFFFFFFFFFF))
 
@@ -631,6 +810,21 @@ library TickMath {
             r := shr(f, r)
         }
 
+        /**
+         * @dev
+         * Check the next 32-bit range.
+         *
+         *     0xFFFFFFFF = 2^32 - 1
+         *
+         * If `r` is bigger than this value, we know the highest bit is
+         * at least 32 positions into the current range.
+         *
+         * `shl(5, ...)` gives:
+         *
+         *     32 or 0
+         *
+         * We add that result to `mostSignificantBit`.
+         */
         assembly {
             let f := shl(5, gt(r, 0xFFFFFFFF))
 
@@ -639,6 +833,22 @@ library TickMath {
             r := shr(f, r)
         }
 
+        /**
+         * @dev
+         * Check the next 16-bit range.
+         *
+         *     0xFFFF = 2^16 - 1
+         *
+         * The answer from `gt()` is 0 or 1.
+         *
+         * After:
+         *
+         *     shl(4, ...)
+         *
+         * `f` becomes:
+         *
+         *     16 or 0
+         */
         assembly {
             let f := shl(4, gt(r, 0xFFFF))
 
@@ -647,6 +857,15 @@ library TickMath {
             r := shr(f, r)
         }
 
+        /**
+         * @dev
+         * Check the next 8-bit range.
+         *
+         *     0xFF = 2^8 - 1
+         *
+         * So this tells us whether the highest bit is at least
+         * 8 positions into the current range.
+         */
         assembly {
             let f := shl(3, gt(r, 0xFF))
 
@@ -655,6 +874,18 @@ library TickMath {
             r := shr(f, r)
         }
 
+        /**
+         * @dev
+         * Check the next 4-bit range.
+         *
+         *     0xF = 15 = 2^4 - 1
+         *
+         * If `r > 15`, we know we need to move by 4 bits.
+         *
+         * Therefore `f` becomes:
+         *
+         *     4 or 0
+         */
         assembly {
             let f := shl(2, gt(r, 0xF))
 
@@ -663,6 +894,23 @@ library TickMath {
             r := shr(f, r)
         }
 
+        /**
+         * @dev
+         * Check the next 2-bit range.
+         *
+         *     0x3 = 3 = 2^2 - 1
+         *
+         * If:
+         *
+         *     r > 3
+         *
+         * then the highest bit is at least 2 positions into the
+         * current range.
+         *
+         * Therefore:
+         *
+         *     f = 2 or 0
+         */
         assembly {
             let f := shl(1, gt(r, 0x3))
 
@@ -671,20 +919,163 @@ library TickMath {
             r := shr(f, r)
         }
 
+        /**
+         * @dev
+         * Finally check whether `r` is bigger than 1.
+         *
+         *     r > 1
+         *
+         * means the highest bit is bit 1.
+         *
+         * If false, the highest bit is bit 0.
+         *
+         * Here we do not need `shl()` because:
+         *
+         *     gt() already gives us 1 or 0
+         *
+         * and that is exactly the amount we need to add.
+         */
         assembly {
             let f := gt(r, 0x1)
 
             mostSignificantBit := or(mostSignificantBit, f)
         }
 
-        // the normalization part
-        if (mostSignificantBit >= 128) r = ratio >> (mostSignificantBit - 127);
-        else r = ratio << (127 - mostSignificantBit);
+        /**
+         * @dev
+         * Normalize the ratio.
+         *
+         * We want the highest 1-bit to be at:
+         *
+         *     bit 127
+         *
+         * There are two cases.
+         *
+         * Case 1:
+         *
+         *     mostSignificantBit >= 128
+         *
+         * Then the highest bit is too far to the left.
+         *
+         * So we shift right:
+         *
+         *     ratio >> (mostSignificantBit - 127)
+         *
+         *
+         * Case 2:
+         *
+         *     mostSignificantBit < 128
+         *
+         * Then the highest bit is too far to the right.
+         *
+         * So we shift left:
+         *
+         *     ratio << (127 - mostSignificantBit)
+         *
+         *
+         * After this:
+         *
+         *     highest 1-bit = bit 127
+         *
+         * This makes the number easy to work with during the
+         * logarithm calculation.
+         */
+        if (mostSignificantBit >= 128) {
+            r = ratio >> (mostSignificantBit - 127);
+        } else {
+            r = ratio << (127 - mostSignificantBit);
+        }
 
+        /**
+         * @dev
+         * Create the starting part of log2.
+         *
+         * We already know where the highest bit was.
+         *
+         * For a number x:
+         *
+         *     MSB(x) = floor(log2(x))
+         *
+         * But our ratio is scaled by 2^128.
+         *
+         * So we subtract 128:
+         *
+         *     mostSignificantBit - 128
+         *
+         * This gives the integer part of the logarithm relative to
+         * the Q128.128 scaling.
+         *
+         * Then:
+         *
+         *     << 64
+         *
+         * means multiply by 2^64.
+         *
+         * This gives `log_2` 64 fractional bits.
+         *
+         * Think of it as:
+         *
+         *     integer part | fractional part
+         *                   ^
+         *                binary point
+         *
+         * The fractional part will be filled in by the repeated
+         * squaring steps below.
+         */
         int256 log_2 = (int256(mostSignificantBit) - 128) << 64;
 
+        /**
+         * @dev
+         * Start finding the fractional part of log2.
+         *
+         * We square `r`.
+         *
+         * Why square?
+         *
+         * Because:
+         *
+         *     r = 2^f
+         *
+         * then:
+         *
+         *     r^2 = 2^(2f)
+         *
+         * So squaring doubles the hidden logarithm fraction.
+         *
+         * Example:
+         *
+         *     r = 1.5
+         *
+         *     r^2 = 2.25
+         *
+         * Since:
+         *
+         *     2.25 >= 2
+         *
+         * we know that:
+         *
+         *     log2(1.5) >= 0.5
+         *
+         * so the first binary fractional bit is `1`.
+         *
+         * `shr(127, ...)` moves the squared value back into the
+         * correct scaled position.
+         *
+         * Then:
+         *
+         *     shr(128, r)
+         *
+         * extracts the important bit.
+         *
+         * So `f` becomes:
+         *
+         *     0 or 1
+         *
+         * That bit is stored in bit 63 of `log_2`.
+         */
         assembly {
             r := shr(127, mul(r, r))
+
             let f := shr(128, r)
 
             log_2 := or(log_2, shl(63, f))
@@ -692,8 +1083,20 @@ library TickMath {
             r := shr(f, r)
         }
 
+        /**
+         * @dev
+         * Find the next fractional bit of log2.
+         *
+         * The previous step stored its bit in position 63.
+         *
+         * This step stores the new bit in position 62.
+         *
+         * We square again because squaring doubles the remaining
+         * logarithm fraction again.
+         */
         assembly {
             r := shr(127, mul(r, r))
+
             let f := shr(128, r)
 
             log_2 := or(log_2, shl(62, f))
@@ -701,16 +1104,31 @@ library TickMath {
             r := shr(f, r)
         }
 
+        /**
+         * @dev
+         * Find the next fractional bit.
+         *
+         * This bit is stored at position 61.
+         */
         assembly {
             r := shr(127, mul(r, r))
+
             let f := shr(128, r)
 
             log_2 := or(log_2, shl(61, f))
 
             r := shr(f, r)
         }
+
+        /**
+         * @dev
+         * Find the next fractional bit.
+         *
+         * This bit is stored at position 60.
+         */
         assembly {
             r := shr(127, mul(r, r))
+
             let f := shr(128, r)
 
             log_2 := or(log_2, shl(60, f))
@@ -718,6 +1136,12 @@ library TickMath {
             r := shr(f, r)
         }
 
+        /**
+         * @dev
+         * Find the next fractional bit.
+         *
+         * This bit is stored at position 59.
+         */
         assembly {
             r := shr(127, mul(r, r))
 
@@ -727,6 +1151,13 @@ library TickMath {
 
             r := shr(f, r)
         }
+
+        /**
+         * @dev
+         * Find the next fractional bit.
+         *
+         * This bit is stored at position 58.
+         */
         assembly {
             r := shr(127, mul(r, r))
 
@@ -737,6 +1168,12 @@ library TickMath {
             r := shr(f, r)
         }
 
+        /**
+         * @dev
+         * Find the next fractional bit.
+         *
+         * This bit is stored at position 57.
+         */
         assembly {
             r := shr(127, mul(r, r))
 
@@ -747,6 +1184,12 @@ library TickMath {
             r := shr(f, r)
         }
 
+        /**
+         * @dev
+         * Find the next fractional bit.
+         *
+         * This bit is stored at position 56.
+         */
         assembly {
             r := shr(127, mul(r, r))
 
@@ -757,6 +1200,12 @@ library TickMath {
             r := shr(f, r)
         }
 
+        /**
+         * @dev
+         * Find the next fractional bit.
+         *
+         * This bit is stored at position 55.
+         */
         assembly {
             r := shr(127, mul(r, r))
 
@@ -767,6 +1216,12 @@ library TickMath {
             r := shr(f, r)
         }
 
+        /**
+         * @dev
+         * Find the next fractional bit.
+         *
+         * This bit is stored at position 54.
+         */
         assembly {
             r := shr(127, mul(r, r))
 
@@ -777,6 +1232,12 @@ library TickMath {
             r := shr(f, r)
         }
 
+        /**
+         * @dev
+         * Find the next fractional bit.
+         *
+         * This bit is stored at position 53.
+         */
         assembly {
             r := shr(127, mul(r, r))
 
@@ -787,6 +1248,12 @@ library TickMath {
             r := shr(f, r)
         }
 
+        /**
+         * @dev
+         * Find the next fractional bit.
+         *
+         * This bit is stored at position 52.
+         */
         assembly {
             r := shr(127, mul(r, r))
 
@@ -797,6 +1264,12 @@ library TickMath {
             r := shr(f, r)
         }
 
+        /**
+         * @dev
+         * Find the next fractional bit.
+         *
+         * This bit is stored at position 51.
+         */
         assembly {
             r := shr(127, mul(r, r))
 
@@ -807,6 +1280,15 @@ library TickMath {
             r := shr(f, r)
         }
 
+        /**
+         * @dev
+         * Find the last fractional bit we need.
+         *
+         * This bit is stored at position 50.
+         *
+         * We do not shift `r` afterwards because there is no next
+         * squaring step.
+         */
         assembly {
             r := shr(127, mul(r, r))
 
@@ -815,12 +1297,133 @@ library TickMath {
             log_2 := or(log_2, shl(50, f))
         }
 
-        int256 log_sqrt10001 = log_2 * 255738958999603826347141; // before it was of 2 now we conver it to our 1.0001 system, sweet!
+        /**
+         * @dev
+         * Convert the base-2 logarithm into the logarithm used by the
+         * Uniswap tick system.
+         *
+         * Uniswap's price system is based on:
+         *
+         *     1.0001^tick
+         *
+         * Because we are working with the square-root price, we use:
+         *
+         *     sqrt(1.0001)^tick
+         *
+         * We already calculated:
+         *
+         *     log2(sqrtPrice)
+         *
+         * Now we convert that logarithm into the new base using a
+         * precomputed fixed-point constant.
+         *
+         * Think of it as:
+         *
+         *     "We measured the number using base 2.
+         *      Now convert that measurement into the tick scale."
+         *
+         * The multiplication is done with integer arithmetic, so the
+         * fixed-point scaling keeps the fractional information.
+         */
+        int256 log_sqrt10001 = log_2 * 255738958999603826347141;
 
+        /**
+         * @dev
+         * Create the lower tick guess.
+         *
+         * `log_sqrt10001` is still scaled by 2^128.
+         *
+         * The subtraction moves the value slightly downward before
+         * removing the fixed-point scaling.
+         *
+         * Then:
+         *
+         *     >> 128
+         *
+         * removes the 128 fractional bits.
+         *
+         * So the result becomes an integer tick.
+         *
+         * Think of this as:
+         *
+         *     "Give me a tick that is safely on the lower side."
+         */
         int24 lowerThanTrueTick = int24((log_sqrt10001 - 3402992956809132418596140100660247210) >> 128);
+
+        /**
+         * @dev
+         * Create the higher tick guess.
+         *
+         * This time we add a constant before removing the Q128 scaling.
+         *
+         * So this gives us a tick on the upper side.
+         *
+         * Think of it as:
+         *
+         *     "Give me another possible tick that is safely on the
+         *      higher side."
+         *
+         * Now we have two possible answers:
+         *
+         *     lowerThanTrueTick
+         *     higherThanTrueTick
+         */
         int24 higherThanTrueTick = int24((log_sqrt10001 + 291339464771989622907027621153398088495) >> 128);
 
-        int24 tick = lowerThanTrueTick == higherThanTrueTick
+        /**
+         * @dev
+         * Choose the final tick.
+         *
+         * First ask:
+         *
+         *     Are the two guesses the same?
+         *
+         * If yes:
+         *
+         *     lowerThanTrueTick == higherThanTrueTick
+         *
+         * then there is no decision to make.
+         *
+         * We simply return that tick.
+         *
+         * If they are different, we check the higher tick.
+         *
+         * We calculate:
+         *
+         *     getSqrtPriceRatioAtTick(higherThanTrueTick)
+         *
+         * and compare that price with our original:
+         *
+         *     sqrtPriceRatio
+         *
+         * If:
+         *
+         *     priceOfHigherTick <= sqrtPriceRatio
+         *
+         * then the higher tick is still valid, so we return it.
+         *
+         * Otherwise the higher tick is too high, so we return the lower tick.
+         *
+         * Think of it as having two guesses:
+         *
+         *     lower = 5
+         *     higher = 6
+         *
+         * We ask:
+         *
+         *     "Does tick 6's price still fit inside our target price?"
+         *
+         * If yes:
+         *
+         *     answer = 6
+         *
+         * If no:
+         *
+         *     answer = 5
+         *
+         * This gives us the correct boundary tick.
+         */
+        tick = lowerThanTrueTick == higherThanTrueTick
             ? lowerThanTrueTick
             : getSqrtPriceRatioAtTick(higherThanTrueTick) <= sqrtPriceRatio ? higherThanTrueTick : lowerThanTrueTick;
     }
